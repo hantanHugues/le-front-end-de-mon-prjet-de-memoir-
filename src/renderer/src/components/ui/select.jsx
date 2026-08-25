@@ -10,7 +10,7 @@ function SelectTrigger({ className, children, ...props }) {
   return (
     <SelectPrimitive.Trigger
       className={cn(
-        'flex h-8 items-center justify-between gap-2 rounded-md border border-border-hi bg-secondary px-3 py-1.5 text-sm text-foreground outline-none transition-colors hover:bg-accent focus:border-primary focus:ring-2 focus:ring-ring/20 disabled:opacity-40 disabled:cursor-default [&>span]:line-clamp-1',
+        'flex h-[34px] items-center justify-between gap-2 rounded-md border border-border-hi bg-secondary px-3 text-[13px] text-foreground outline-none transition-colors hover:bg-accent focus:border-primary focus:ring-2 focus:ring-ring/20 disabled:opacity-40 disabled:cursor-default [&>span]:line-clamp-1',
         className
       )}
       {...props}
@@ -48,7 +48,7 @@ function SelectItem({ className, children, ...props }) {
   return (
     <SelectPrimitive.Item
       className={cn(
-        'relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-3 text-sm text-foreground outline-none focus:bg-accent data-[disabled]:opacity-40 data-[disabled]:pointer-events-none',
+        'relative flex w-full cursor-pointer select-none items-center rounded-sm py-[7px] pl-8 pr-3 text-[13px] text-foreground outline-none focus:bg-accent data-[disabled]:opacity-40 data-[disabled]:pointer-events-none',
         className
       )}
       {...props}
@@ -66,7 +66,7 @@ function SelectItem({ className, children, ...props }) {
 function SelectLabel({ className, ...props }) {
   return (
     <SelectPrimitive.Label
-      className={cn('px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground', className)}
+      className={cn('px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground', className)}
       {...props}
     />
   )

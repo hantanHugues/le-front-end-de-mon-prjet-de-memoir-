@@ -60,7 +60,7 @@ function AlertDialogDescription({ className, ...props }) {
   return (
     <AlertDialogPrimitive.Description
       className={cn(className)}
-      style={{ fontSize: 12.5, color: 'var(--muted-foreground)', lineHeight: 1.55, marginTop: 4 }}
+      style={{ fontSize: 13, color: 'var(--muted-foreground)', lineHeight: 1.55, marginTop: 4 }}
       {...props}
     />
   )

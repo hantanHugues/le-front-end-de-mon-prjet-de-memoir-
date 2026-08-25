@@ -6,6 +6,12 @@ import { safeAction } from '../utils/safeAction'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
 import { VideoOff, RefreshCw, Loader2 } from 'lucide-react'
 import { Button } from '../components/ui/button'
+import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter,
+  AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel,
+} from '../components/ui/alert-dialog'
 
 function Clock() {
   const [time, setTime] = useState('')
@@ -38,6 +44,7 @@ export default function Surveillance() {
   const [cameras,     setCameras]     = useState([])
   const [activeCam,   setActiveCam]   = useState(null)
   const [doorLoading, setDoorLoading] = useState(false)
+  const [lockOpen,    setLockOpen]    = useState(false)
   const [countdown,   setCountdown]   = useState(null)
   const imgRef   = useRef(null)
   const countRef = useRef(null)
@@ -98,7 +105,11 @@ export default function Surveillance() {
     setCountdown(null)
   }
 
-  async function handleLockDoor() {
+  // Le verrouillage agit sur une gâche physique : verrouiller pendant que
+  // quelqu'un franchit la porte est le scénario risqué. L'ouverture avait déjà
+  // un compte à rebours annulable ; le verrouillage partait sans rien demander.
+  async function confirmLockDoor() {
+    setLockOpen(false)
     setDoorLoading(true)
     await safeAction(lockDoor, 'Porte verrouillée', 'Impossible de verrouiller la porte')
     setDoorLoading(false)
@@ -114,17 +125,10 @@ export default function Surveillance() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
       {/* Topbar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', height: 52, flexShrink: 0,
-        borderBottom: '1px solid var(--border)', background: 'var(--card)',
-      }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>Surveillance</div>
-          <div style={{ fontSize: 12, color: 'var(--muted-foreground)', marginTop: 1 }}>
-            {activeCamInfo ? `${activeCamInfo.name} · ${activeCamInfo.fps} fps` : 'Flux principal'}
-          </div>
-        </div>
+      <PageHeader
+        title="Surveillance"
+        subtitle={activeCamInfo ? `${activeCamInfo.name} · ${activeCamInfo.fps} fps` : 'Flux principal'}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {cameras.length > 0 && (
             /* `Select` Radix et non `<select>` natif : le menu natif est rendu
@@ -148,7 +152,7 @@ export default function Surveillance() {
           )}
           <Clock />
         </div>
-      </div>
+      </PageHeader>
 
       {/* Main grid */}
       <div className="surv">
@@ -307,7 +311,7 @@ export default function Surveillance() {
             </Button>
             <Button
               variant="destructive"
-              onClick={handleLockDoor}
+              onClick={() => setLockOpen(true)}
               disabled={doorLoading || countdown !== null}
             >
               Verrouiller
@@ -315,6 +319,22 @@ export default function Surveillance() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={lockOpen} onOpenChange={setLockOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Verrouiller la porte ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La gâche va être verrouillée immédiatement. Assurez-vous que personne
+              n'est en train de franchir le passage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLockDoor}>Verrouiller</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

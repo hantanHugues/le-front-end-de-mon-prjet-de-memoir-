@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { RefreshCw, TriangleAlert, Bell, Eye } from 'lucide-react'
+import { RefreshCw, TriangleAlert, Bell, ShieldAlert, ShieldCheck, ServerCrash } from 'lucide-react'
 import { getLogs } from '../api/client'
 import { bridge } from '../api/bridge'
 import { EVENT_TYPES } from '../constants/events'
 import { Switch } from '../components/ui/switch'
 import { Skeleton } from '../components/ui/skeleton'
 import { Button } from '../components/ui/button'
+import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
+import { SectionLabel } from '../components/ui/section-label'
+import { Field } from '../components/ui/field'
+import { Input } from '../components/ui/input'
 
 const KEY_WA_ENABLED = 'biogate_wa_enabled'
 const KEY_WA_NUMBER  = 'biogate_wa_number'
@@ -97,27 +102,25 @@ function AlertItem({ log }) {
   )
 }
 
-function Toggle({ on, onChange }) {
-  return (
-    <Switch checked={on} onCheckedChange={onChange} />
-  )
-}
-
-function NotifRow({ name, eventKey, checked, onChange }) {
+// `aria-label` porté par le Switch : le libellé est un élément frère, jamais
+// associé au contrôle — un lecteur d'écran annonçait « interrupteur, coché »
+// sans dire de quoi il s'agissait.
+function NotifRow({ name, eventKey, checked, onChange, last }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '10px 0', borderBottom: '1px solid var(--border)',
+      gap: 16, padding: '11px 0',
+      borderBottom: last ? 'none' : '1px solid var(--border)',
     }}>
-      <div>
+      <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--foreground)', marginBottom: 2 }}>
           {name}
         </div>
-        <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--t3)' }}>
+        <div style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--muted-foreground)' }}>
           {eventKey}
         </div>
       </div>
-      <Toggle on={checked} onChange={onChange} />
+      <Switch aria-label={name} checked={checked} onCheckedChange={onChange} />
     </div>
   )
 }
@@ -133,12 +136,13 @@ export default function Alertes() {
   const [nIntruder,  setNIntruder] = useState(() => ls(KEY_N_INTRUDER, true))
   const [nDenied,    setNDenied]   = useState(() => ls(KEY_N_DENIED, false))
   const [nTimeout,   setNTimeout]  = useState(() => ls(KEY_N_TIMEOUT, true))
+  const [loadErr,    setLoadErr]   = useState(false)
 
   function fetchIntruders() {
     setLoading(true)
     return getLogs({ event_type: EVENT_TYPES.INTRUDER_CONFIRMED, days: 30 })
-      .then(r => setIntruders(r.data.logs || r.data || []))
-      .catch(() => setIntruders([]))
+      .then(r => { setIntruders(r.data.logs || r.data || []); setLoadErr(false) })
+      .catch(() => { setIntruders([]); setLoadErr(true) })
       .finally(() => setLoading(false))
   }
 
@@ -153,41 +157,15 @@ export default function Alertes() {
     toast.success('Notification desktop envoyée')
   }
 
-  /* ── Shared style primitives ── */
-  const sectionHeader = { padding: '18px 18px 14px' }
-  const sectionTitle  = { fontSize: 13, fontWeight: 600, color: 'var(--foreground)' }
-  const fieldLabel    = {
-    display: 'block', fontSize: 12, fontWeight: 600, letterSpacing: '.07em',
-    textTransform: 'uppercase', color: 'var(--t3)', marginBottom: 5,
-  }
-  const fieldInput = {
-    width: '100%', background: 'var(--secondary)',
-    border: '1px solid var(--border-hi)',
-    color: 'var(--foreground)', fontSize: 13,
-    fontFamily: 'var(--fu)', padding: '7px 10px',
-    borderRadius: 6, outline: 'none',
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      {/* Topbar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', height: 52, flexShrink: 0,
-        borderBottom: '1px solid var(--border)', background: 'var(--card)',
-      }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>Alertes</div>
-          <div style={{ fontSize: 12, color: 'var(--muted-foreground)', marginTop: 1 }}>
-            Intrusions — 30 derniers jours
-          </div>
-        </div>
+      <PageHeader title="Alertes" subtitle="Intrusions — 30 derniers jours">
         <Button onClick={fetchIntruders} disabled={loading}>
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           Actualiser
         </Button>
-      </div>
+      </PageHeader>
 
       {/* 2-col layout */}
       <div style={{
@@ -197,14 +175,9 @@ export default function Alertes() {
 
         {/* Alert list */}
         <div style={{ background: 'var(--background)', overflowY: 'auto' }}>
-          <div style={{
-            padding: '16px 20px 12px',
-            fontSize: 11, fontWeight: 700, letterSpacing: '.09em',
-            textTransform: 'uppercase', color: 'var(--muted-foreground)',
-            borderBottom: '1px solid var(--border)',
-          }}>
+          <SectionLabel icon={ShieldAlert} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
             Intrusions confirmées
-          </div>
+          </SectionLabel>
 
           {loading && Array.from({ length: 3 }).map((_, i) => (
             <div key={i} style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
@@ -212,19 +185,26 @@ export default function Alertes() {
             </div>
           ))}
 
-          {!loading && intruders.length === 0 && (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              height: 180, fontFamily: 'var(--fm)', fontSize: 12,
-              letterSpacing: '.07em', textTransform: 'uppercase',
-              color: 'var(--muted-foreground)',
-            }}>
-              Aucune intrusion détectée
-            </div>
+          {!loading && loadErr && (
+            <EmptyState
+              variant="error"
+              icon={ServerCrash}
+              title="Serveur injoignable"
+              description="Impossible de récupérer les alertes. Vérifiez que le service BioGate est démarré."
+              action={<Button variant="accent" onClick={fetchIntruders}><RefreshCw size={14} /> Réessayer</Button>}
+            />
           )}
 
-          {!loading && intruders.map((log, i) => (
-            <AlertItem key={log.id ?? i} log={log} i={i} />
+          {!loading && !loadErr && intruders.length === 0 && (
+            <EmptyState
+              icon={ShieldCheck}
+              title="Aucune intrusion détectée"
+              description="Aucune intrusion n'a été confirmée sur les 30 derniers jours. Le système fonctionne normalement."
+            />
+          )}
+
+          {!loading && !loadErr && intruders.map((log, i) => (
+            <AlertItem key={log.id ?? i} log={log} />
           ))}
         </div>
 
@@ -232,10 +212,11 @@ export default function Alertes() {
         <div style={{ background: 'var(--card)', overflowY: 'auto' }}>
 
           {/* WhatsApp section */}
-          <div style={{ ...sectionHeader, borderBottom: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <span style={sectionTitle}>WhatsApp</span>
+          <div style={{ padding: '4px 20px 20px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 0 14px' }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>WhatsApp</span>
               <Switch
+                aria-label="Activer les notifications WhatsApp"
                 checked={waEnabled}
                 onCheckedChange={toggle(setWaEnabled, KEY_WA_ENABLED)}
               />
@@ -244,50 +225,45 @@ export default function Alertes() {
             {/* Warning banner */}
             <div style={{
               background: 'rgba(240,177,50,.08)',
-              border: '1px solid rgba(240,177,50,.20)',
-              borderRadius: 6, padding: '8px 10px', marginBottom: 12,
-              fontFamily: 'var(--fm)', fontSize: 12, lineHeight: 1.5,
-              color: 'var(--pending)',
+              border: '1px solid rgba(240,177,50,.22)',
+              borderRadius: 8, padding: '10px 12px', marginBottom: 16,
+              fontSize: 12, lineHeight: 1.5, color: 'var(--pending)',
             }}>
-              Backend non connecté — sauvegarde locale uniquement, aucun message WhatsApp envoyé.
+              Backend non connecté — sauvegarde locale uniquement, aucun message WhatsApp n'est envoyé.
             </div>
 
-            <div style={{ marginTop: 10 }}>
-              <label style={fieldLabel}>Numéro destinataire</label>
-              <input
-                style={fieldInput}
-                type="tel"
-                value={waNumber}
-                placeholder="+22997000000"
-                onChange={e => { setWaNumber(e.target.value); lsSet(KEY_WA_NUMBER, e.target.value) }}
-              />
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <label style={fieldLabel}>API Key (Twilio / GreenAPI)</label>
-              <input
-                style={{ ...fieldInput, fontFamily: 'var(--fm)', fontSize: 13 }}
-                type="password"
-                value={waKey}
-                placeholder="sk-live-••••••••"
-                onChange={e => { setWaKey(e.target.value); lsSet(KEY_WA_APIKEY, e.target.value) }}
-              />
-            </div>
+            <Field label="Numéro destinataire" className="mb-3">
+              {id => (
+                <Input
+                  id={id} type="tel" value={waNumber}
+                  placeholder="+22997000000"
+                  onChange={e => { setWaNumber(e.target.value); lsSet(KEY_WA_NUMBER, e.target.value) }}
+                />
+              )}
+            </Field>
 
-            <Button variant="accent" className="w-full mt-3.5" onClick={handleTestSend}>
+            <Field label="API Key (Twilio / GreenAPI)">
+              {id => (
+                <Input
+                  id={id} type="password" value={waKey}
+                  className="font-mono"
+                  placeholder="sk-live-••••••••"
+                  onChange={e => { setWaKey(e.target.value); lsSet(KEY_WA_APIKEY, e.target.value) }}
+                />
+              )}
+            </Field>
+
+            <Button variant="accent" className="w-full mt-4" onClick={handleTestSend}>
               <Bell size={14} />
               Test notification desktop
             </Button>
           </div>
 
           {/* Notifications desktop */}
-          <div style={{ padding: '18px 18px 14px' }}>
-            <div style={{
-              fontSize: 11, fontWeight: 700, letterSpacing: '.09em',
-              textTransform: 'uppercase', color: 'var(--muted-foreground)',
-              marginBottom: 12,
-            }}>
+          <div style={{ padding: '0 20px 18px' }}>
+            <SectionLabel icon={Bell} style={{ padding: '20px 0 10px' }}>
               Notifications desktop
-            </div>
+            </SectionLabel>
             <NotifRow
               name="Intrus confirmé" eventKey="INTRUDER_CONFIRMED"
               checked={nIntruder} onChange={toggle(setNIntruder, KEY_N_INTRUDER)}
@@ -296,20 +272,11 @@ export default function Alertes() {
               name="Accès refusé" eventKey="DENIED"
               checked={nDenied} onChange={toggle(setNDenied, KEY_N_DENIED)}
             />
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '10px 0',
-            }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--foreground)', marginBottom: 2 }}>
-                  Timeout MFA
-                </div>
-                <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--t3)' }}>
-                  MFA_TIMEOUT
-                </div>
-              </div>
-              <Switch checked={nTimeout} onCheckedChange={toggle(setNTimeout, KEY_N_TIMEOUT)} />
-            </div>
+            <NotifRow
+              name="Timeout MFA" eventKey="MFA_TIMEOUT"
+              checked={nTimeout} onChange={toggle(setNTimeout, KEY_N_TIMEOUT)}
+              last
+            />
           </div>
 
         </div>

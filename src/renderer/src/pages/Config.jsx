@@ -9,6 +9,8 @@ import {
   getCameras, addCamera, deleteCamera, scanUsbCameras,
 } from '../api/client'
 import { Button } from '../components/ui/button'
+import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Switch } from '../components/ui/switch'
@@ -118,7 +120,9 @@ function Slider({ label, cfgKey, min, max, step = 1, unit = '', value, onChange 
 function ParamToggle({ label, cfgKey, value, onChange, note }) {
   return (
     <Row label={label} cfgKey={cfgKey} note={note}>
-      <Switch checked={!!value} onCheckedChange={v => onChange(cfgKey, v)} />
+      {/* Le libellé est un élément frère, jamais associé au contrôle : sans
+          `aria-label`, un lecteur d'écran annonce « interrupteur » sans dire lequel. */}
+      <Switch aria-label={label} checked={!!value} onCheckedChange={v => onChange(cfgKey, v)} />
     </Row>
   )
 }
@@ -399,26 +403,16 @@ export default function Config() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Topbar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', height: 52, flexShrink: 0,
-        borderBottom: '1px solid var(--border)', background: 'var(--card)',
-      }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>Configuration</div>
-          <div style={{ fontSize: 12, color: 'var(--muted-foreground)', marginTop: 1 }}>
-            Paramètres système BioGate v7.0
-          </div>
-        </div>
+      <PageHeader title="Configuration" subtitle="Paramètres système BioGate v7.0">
         <Button
-          variant="accent" size="sm" onClick={handleSave}
+          variant="accent" onClick={handleSave}
           disabled={saving || loadErr}
           title={loadErr ? 'Configuration non chargée — sauvegarde désactivée' : undefined}
         >
-          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
           Sauvegarder
         </Button>
-      </div>
+      </PageHeader>
 
       {loadErr && (
         <div style={{

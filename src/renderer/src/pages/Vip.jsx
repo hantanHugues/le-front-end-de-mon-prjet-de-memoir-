@@ -2,7 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import { getProfiles, deleteProfile, enrollVip } from '../api/client'
 import { toast } from 'sonner'
 import { Button } from '../components/ui/button'
-import { UserPlus, X, Check, Loader2, Upload } from 'lucide-react'
+import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
+import { Field } from '../components/ui/field'
+import { Input } from '../components/ui/input'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '../components/ui/dialog'
+import { UserPlus, X, Check, Loader2, Upload, ServerCrash, RefreshCw } from 'lucide-react'
+import { Skeleton } from '../components/ui/skeleton'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter,
   AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel,
@@ -36,71 +44,73 @@ function EnrollModal({ onClose, onDone }) {
     } finally { setLoading(false) }
   }
 
-  const overlay  = { position: 'fixed', inset: 0, background: 'rgba(30,31,34,0.88)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }
-  const box      = { width: 420, background: 'var(--card)', border: '1px solid var(--border-hi)', borderRadius: 10, boxShadow: '0 16px 48px rgba(0,0,0,0.5)', padding: 26 }
-  const fieldLbl = { display: 'block', fontSize: 12, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--t3)', marginBottom: 5 }
-  const inp      = { width: '100%', background: 'var(--secondary)', border: '1px solid var(--border-hi)', color: 'var(--foreground)', fontSize: 14, fontFamily: 'var(--fu)', padding: '9px 12px', borderRadius: 7, outline: 'none' }
-
+  // Portée sur Dialog (Radix) plutôt que sur un <div> maison : on récupère la
+  // touche Échap, le piège à focus, le retour du focus au déclencheur, le
+  // verrouillage du défilement et `role="dialog"` — rien de tout cela n'était
+  // géré par la version écrite à la main.
   return (
-    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={box}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--foreground)', marginBottom: 18, letterSpacing: '-0.015em' }}>
-          Enrôler un VIP
-        </div>
-        <form onSubmit={submit}>
-          {/* Name */}
-          <div style={{ marginBottom: 14 }}>
-            <label style={fieldLbl}>Nom complet</label>
-            <input
-              style={inp}
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Prénom Nom"
-              required
-            />
-          </div>
+    <Dialog open onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-[420px]">
+        <DialogHeader>
+          <DialogTitle>Enrôler un VIP</DialogTitle>
+          <DialogDescription>
+            La photo servira à générer le gabarit biométrique de reconnaissance.
+          </DialogDescription>
+        </DialogHeader>
 
-          {/* File picker */}
-          <div style={{ marginBottom: 14 }}>
-            <label style={fieldLbl}>Photo de référence</label>
-            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
-              onChange={e => setFile(e.target.files[0])} />
-            <button
-              type="button"
-              onClick={() => fileRef.current.click()}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                width: '100%', padding: '9px 12px', justifyContent: 'center',
-                background: 'var(--secondary)', border: '1px solid var(--border-hi)',
-                color: file ? 'var(--foreground)' : 'var(--muted-foreground)',
-                fontSize: 13, borderRadius: 7, cursor: 'pointer',
-                transition: 'border-color .15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-hi)'}
-            >
-              <Upload size={13} />
-              {file ? file.name : 'Choisir une photo…'}
-            </button>
-          </div>
+        <form onSubmit={submit}>
+          <Field label="Nom complet" className="mb-3.5">
+            {id => (
+              <Input
+                id={id} value={name} required
+                onChange={e => setName(e.target.value)}
+                placeholder="Prénom Nom"
+              />
+            )}
+          </Field>
+
+          <Field label="Photo de référence" className="mb-3.5">
+            {id => (
+              <>
+                <input
+                  ref={fileRef} id={id} type="file" accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={e => setFile(e.target.files[0])}
+                />
+                <Button
+                  type="button" variant="outline"
+                  className="w-full justify-center"
+                  onClick={() => fileRef.current.click()}
+                >
+                  <Upload size={14} />
+                  {file ? file.name : 'Choisir une photo…'}
+                </Button>
+              </>
+            )}
+          </Field>
 
           {error && (
-            <div style={{ fontSize: 13, color: 'var(--denied)', marginBottom: 12 }}>{error}</div>
+            <div style={{
+              fontSize: 13, color: 'var(--denied)', marginBottom: 12,
+              background: 'rgba(242,63,67,.10)', border: '1px solid rgba(242,63,67,.22)',
+              borderRadius: 8, padding: '9px 11px', lineHeight: 1.45,
+            }}>
+              {error}
+            </div>
           )}
 
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
-            <Button type="button" variant="outline" onClick={onClose}>
+          <DialogFooter>
+            <Button type="button" variant="default" onClick={onClose}>
               Annuler
             </Button>
-            <Button type="submit" variant="accent" disabled={loading || !file || !name.trim()}>
+            <Button type="submit" variant="primary" disabled={loading || !file || !name.trim()}>
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
               Enrôler
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -172,13 +182,15 @@ export default function Vip() {
   const [loading,   setLoading]   = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [pendingDel, setPendingDel] = useState(null)
+  const [loadErr,   setLoadErr]   = useState(false)
 
   async function load() {
     setLoading(true)
     try {
       const res = await getProfiles()
       setProfiles(res.data.profiles || res.data || [])
-    } catch { setProfiles([]) }
+      setLoadErr(false)
+    } catch { setProfiles([]); setLoadErr(true) }
     finally  { setLoading(false) }
   }
 
@@ -202,29 +214,46 @@ export default function Vip() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      {/* Topbar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', height: 52, flexShrink: 0,
-        borderBottom: '1px solid var(--border)', background: 'var(--card)',
-      }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>Profils VIP</div>
-          <div style={{ fontSize: 12, color: 'var(--muted-foreground)', marginTop: 1 }}>
-            {loading ? '…' : `${profiles.length} profil${profiles.length !== 1 ? 's' : ''} enrôlé${profiles.length !== 1 ? 's' : ''}`}
-          </div>
-        </div>
+      <PageHeader
+        title="Profils VIP"
+        subtitle={loading ? '…' : `${profiles.length} profil${profiles.length !== 1 ? 's' : ''} enrôlé${profiles.length !== 1 ? 's' : ''}`}
+      >
         <Button variant="accent" onClick={() => setShowModal(true)}>
           <UserPlus size={14} />
           Enrôler
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Grid */}
       {loading ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-          <span className="spinner" style={{ width: 18, height: 18 }} />
+        // Squelettes plutôt qu'un spinner : cohérent avec Journal et Config,
+        // et la forme de la grille est annoncée avant l'arrivée des données.
+        <div style={{
+          flex: 1, overflowY: 'auto', padding: 24,
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 260px))',
+          gap: 12, alignContent: 'start',
+        }}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} style={{ height: 152, borderRadius: 10 }} />
+          ))}
         </div>
+      ) : loadErr ? (
+        <EmptyState
+          className="flex-1"
+          variant="error"
+          icon={ServerCrash}
+          title="Serveur injoignable"
+          description="Impossible de récupérer les profils enrôlés. Vérifiez que le service BioGate est démarré."
+          action={<Button variant="accent" onClick={load}><RefreshCw size={14} /> Réessayer</Button>}
+        />
+      ) : profiles.length === 0 ? (
+        <EmptyState
+          className="flex-1"
+          icon={UserPlus}
+          title="Aucun profil enrôlé"
+          description="Enrôlez une première personne pour que le système puisse la reconnaître à l'entrée."
+          action={<Button variant="accent" onClick={() => setShowModal(true)}><UserPlus size={14} /> Enrôler</Button>}
+        />
       ) : (
         // `minmax(240px, 260px)` plutôt que `1fr` : au-delà de six profils les
         // cartes s'aligneraient sinon sur toute la largeur de l'écran et

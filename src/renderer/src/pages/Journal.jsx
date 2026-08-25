@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Download, Trash2, ShieldAlert, ImageIcon, Loader2 } from 'lucide-react'
+import { Download, Trash2, ShieldAlert, ImageIcon, Loader2, ServerCrash, FileSearch, RefreshCw } from 'lucide-react'
 import { getLogs, deleteLog, purgeLogs } from '../api/client'
 import { eventMeta, EVENT_FILTER_OPTIONS } from '../constants/events'
 import { Skeleton } from '../components/ui/skeleton'
 import { Button } from '../components/ui/button'
+import { PageHeader } from '../components/ui/page-header'
+import { EmptyState } from '../components/ui/empty-state'
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from '../components/ui/table'
@@ -54,6 +56,10 @@ export default function Journal() {
   const [purging,    setPurging]    = useState(false)
   const [pendingDel, setPendingDel] = useState(null)
   const [purgeOpen,  setPurgeOpen]  = useState(false)
+  // « Serveur injoignable » et « aucun événement » produisaient exactement le
+  // même écran. Si le backend tombe pendant la démonstration, il faut que ce
+  // soit dit.
+  const [loadErr,    setLoadErr]    = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -63,8 +69,9 @@ export default function Journal() {
       if (filter.event_type) params.event_type = filter.event_type
       if (filter.vip_name)   params.vip_name   = filter.vip_name
       const res = await getLogs(params)
+      setLoadErr(false)
       setLogs(res.data.logs || res.data || [])
-    } catch { setLogs([]) }
+    } catch { setLogs([]); setLoadErr(true) }
     finally  { setLoading(false) }
   }, [filter])
 
@@ -103,28 +110,18 @@ export default function Journal() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      {/* Topbar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', height: 52, flexShrink: 0,
-        borderBottom: '1px solid var(--border)', background: 'var(--card)',
-      }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>Journal d'accès</div>
-          <div style={{ fontSize: 12, color: 'var(--muted-foreground)', marginTop: 1 }}>
-            {loading ? '…' : `${logs.length} événement${logs.length !== 1 ? 's' : ''}`}
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Button onClick={exportCsv}>
-            <Download size={14} /> CSV
-          </Button>
-          <Button variant="destructive" onClick={() => setPurgeOpen(true)} disabled={purging}>
-            {purging ? <Loader2 size={14} className="animate-spin" /> : <ShieldAlert size={14} />}
-            Purge RGPD
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Journal d'accès"
+        subtitle={loading ? '…' : `${logs.length} événement${logs.length !== 1 ? 's' : ''}`}
+      >
+        <Button onClick={exportCsv}>
+          <Download size={14} /> CSV
+        </Button>
+        <Button variant="destructive" onClick={() => setPurgeOpen(true)} disabled={purging}>
+          {purging ? <Loader2 size={14} className="animate-spin" /> : <ShieldAlert size={14} />}
+          Purge RGPD
+        </Button>
+      </PageHeader>
 
       {/* Filter bar */}
       <div style={{
@@ -181,14 +178,20 @@ export default function Journal() {
           <div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 6 }}>
             {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} style={{ height: 36, borderRadius: 4 }} />)}
           </div>
+        ) : loadErr ? (
+          <EmptyState
+            variant="error"
+            icon={ServerCrash}
+            title="Serveur injoignable"
+            description="Impossible de récupérer le journal. Vérifiez que le service BioGate est démarré et que l'adresse du serveur est correcte."
+            action={<Button variant="accent" onClick={load}><RefreshCw size={14} /> Réessayer</Button>}
+          />
         ) : logs.length === 0 ? (
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', height: 192,
-            fontFamily: 'var(--fm)', fontSize: 12, letterSpacing: '.07em',
-            textTransform: 'uppercase', color: 'var(--muted-foreground)',
-          }}>
-            Aucun événement
-          </div>
+          <EmptyState
+            icon={FileSearch}
+            title="Aucun événement"
+            description="Aucun accès n'a été enregistré sur la période sélectionnée. Élargissez le filtre de dates pour voir plus d'historique."
+          />
         ) : (
           <Table>
             <TableHeader>

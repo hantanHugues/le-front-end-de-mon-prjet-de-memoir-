@@ -4,6 +4,8 @@ import { getLogs } from '../api/client'
 import { EVENT_TYPES } from '../constants/events'
 import { Skeleton } from '../components/ui/skeleton'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
+import { PageHeader } from '../components/ui/page-header'
+import { SectionLabel } from '../components/ui/section-label'
 
 /* ── Canvas bar chart ──────────────────────────────────────────────── */
 function BarChart({ data }) {
@@ -176,16 +178,7 @@ export default function Stats() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Topbar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', height: 52, flexShrink: 0,
-        borderBottom: '1px solid var(--border)', background: 'var(--card)',
-      }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>Statistiques</div>
-          <div style={{ fontSize: 12, color: 'var(--muted-foreground)', marginTop: 1 }}>{dLabel}</div>
-        </div>
+      <PageHeader title="Statistiques" subtitle={dLabel}>
         <Select value={days} onValueChange={setDays}>
           <SelectTrigger style={{ width: 168 }}><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -194,7 +187,7 @@ export default function Stats() {
             <SelectItem value="30">30 jours</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </PageHeader>
 
       {loading ? (
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>

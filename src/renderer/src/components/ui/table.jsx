@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils'
 const Table = forwardRef(function Table({ className, ...props }, ref) {
   return (
     <div className="w-full overflow-x-auto">
-      <table ref={ref} className={cn('w-full caption-bottom text-sm border-collapse', className)} {...props} />
+      <table ref={ref} className={cn('w-full caption-bottom border-collapse', className)} {...props} />
     </div>
   )
 })

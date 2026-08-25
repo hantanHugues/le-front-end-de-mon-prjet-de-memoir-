@@ -47,11 +47,11 @@ function DialogHeader({ className, ...props }) {
 }
 
 function DialogTitle({ className, ...props }) {
-  return <DialogPrimitive.Title className={cn('text-sm font-semibold text-foreground tracking-tight', className)} {...props} />
+  return <DialogPrimitive.Title className={cn('text-[14px] font-semibold text-foreground tracking-tight', className)} {...props} />
 }
 
 function DialogDescription({ className, ...props }) {
-  return <DialogPrimitive.Description className={cn('text-xs text-muted-foreground', className)} {...props} />
+  return <DialogPrimitive.Description className={cn('text-[13px] text-muted-foreground leading-relaxed', className)} {...props} />
 }
 
 function DialogFooter({ className, ...props }) {

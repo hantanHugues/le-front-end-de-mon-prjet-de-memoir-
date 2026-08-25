@@ -242,26 +242,6 @@ html, body, #root {
 ═══════════════════════════════════════════════ */
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-/* ── Buttons ─────────────────────────────────── */
-.btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 12px; font-size: 12.5px; font-family: var(--fu); font-weight: 500;
-  border: 1px solid var(--border-hi); background: var(--accent); color: var(--t2);
-  cursor: pointer; border-radius: 6px;
-  transition: color .15s, border-color .15s, background .15s, transform .1s;
-  outline: none;
-}
-.btn:hover { color: var(--foreground); background: #404249; transform: translateY(-1px); }
-.btn:active { transform: scale(0.98); }
-.btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.btn:disabled { opacity: .36; cursor: default; transform: none; }
-
-.btn-accent {
-  border-color: rgba(88,101,242,0.35); color: var(--primary);
-  background: rgba(88,101,242,0.12);
-}
-.btn-accent:hover { background: rgba(88,101,242,0.20); border-color: rgba(88,101,242,0.55); }
-
 /* ── Section label ─────────────────────────── */
 
 /* ── State chip ────────────────────────────── */
@@ -284,14 +264,6 @@ html, body, #root {
 /* ── Score bar ─────────────────────────────── */
 .sbar { height: 4px; background: var(--border-hi); position: relative; overflow: hidden; flex: 1; border-radius: 2px; }
 .sbar-fill { position: absolute; top: 0; left: 0; height: 100%; transition: width .4s var(--ease); border-radius: 1px; }
-
-/* ── Form / select ─────────────────────────── */
-
-.spinner {
-  width: 14px; height: 14px; border: 1.5px solid var(--border-hi);
-  border-top-color: var(--primary); border-radius: 50%;
-  animation: spin .65s linear infinite; display: inline-block;
-}
 
 /* ── Custom range slider ────────────────────── */
 input[type="range"] {
@@ -332,37 +304,6 @@ input[type="range"]::-moz-range-thumb {
   transition: box-shadow .15s;
 }
 
-/* ── Pairing screen ────────────────────────── */
-.pairing-screen {
-  display: flex; align-items: center; justify-content: center;
-  height: 100vh; background: var(--background);
-}
-.pairing-card {
-  width: 420px; background: var(--card);
-  border: 1px solid var(--border-hi); border-radius: 12px;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
-  padding: 40px;
-}
-.pairing-logo {
-  font-size: 20px; font-weight: 700; letter-spacing: -0.03em;
-  color: var(--foreground); margin-bottom: 4px;
-}
-.pairing-sub { font-size: 12px; color: var(--t2); margin-bottom: 32px; }
-.field { margin-bottom: 18px; }
-.field-label {
-  display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.07em;
-  text-transform: uppercase; color: var(--t3); margin-bottom: 6px;
-}
-.field-input {
-  width: 100%; background: var(--secondary); border: 1px solid var(--border-hi);
-  color: var(--foreground); font-size: 13px; font-family: var(--fu);
-  padding: 9px 12px; outline: none; border-radius: 7px;
-  transition: border-color .15s, box-shadow .15s;
-}
-.field-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(88,101,242,0.15); }
-.field-input.mono { font-family: var(--fm); letter-spacing: 0.18em; font-size: 15px; }
-.pairing-hint { font-size: 12px; color: var(--t2); margin-bottom: 18px; line-height: 1.6; }
-.pairing-err  { font-size: 12px; color: var(--denied); margin-bottom: 12px; }
 .pairing-link {
   font-size: 12px; color: var(--t2); margin-top: 14px; cursor: pointer;
   background: none; border: none; padding: 0; font-family: inherit;
