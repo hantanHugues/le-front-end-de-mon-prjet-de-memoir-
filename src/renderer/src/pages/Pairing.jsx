@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { requestPair, authToken } from '../api/client'
+import { bridge } from '../api/bridge'
 
 export default function Pairing({ onPaired }) {
   const [step,      setStep]      = useState('url')   // 'url' | 'pin'
@@ -31,8 +32,8 @@ export default function Pairing({ onPaired }) {
     try {
       const res   = await authToken(serverUrl, pin.trim())
       const token = res.data.access_token
-      await window.electronAPI.config.set({ serverUrl })
-      await window.electronAPI.token.set(token)
+      await bridge.config.set({ serverUrl })
+      await bridge.token.set(token)
       onPaired(serverUrl, token)
     } catch (err) {
       const msg = err.response?.data?.detail || err.message

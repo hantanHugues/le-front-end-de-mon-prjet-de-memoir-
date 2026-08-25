@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { configure, healthCheck } from './api/client'
+import { bridge } from './api/bridge'
+import { Toaster } from 'sonner'
 import Sidebar      from './components/Sidebar'
 import Pairing      from './pages/Pairing'
 import Surveillance from './pages/Surveillance'
@@ -8,7 +10,6 @@ import Vip          from './pages/Vip'
 import Config       from './pages/Config'
 import Stats        from './pages/Stats'
 import Alertes      from './pages/Alertes'
-import ToastContainer from './components/Toast'
 
 const PAGES = {
   surveillance: Surveillance,
@@ -19,17 +20,29 @@ const PAGES = {
   alertes:      Alertes,
 }
 
+// Page d'ouverture lisible depuis l'URL (`?page=journal`). Sert à ouvrir une
+// page précise directement dans le navigateur pendant le travail de design ;
+// sous Electron l'URL n'a pas de paramètre, on retombe donc sur Surveillance.
+function initialPage() {
+  try {
+    const p = new URLSearchParams(location.search).get('page')
+    return p && p in PAGES ? p : 'surveillance'
+  } catch {
+    return 'surveillance'
+  }
+}
+
 export default function App() {
   const [ready,     setReady]     = useState(false)
   const [paired,    setPaired]    = useState(false)
   const [serverUrl, setServerUrl] = useState('')
   const [online,    setOnline]    = useState(false)
-  const [page,      setPage]      = useState('surveillance')
+  const [page,      setPage]      = useState(initialPage)
 
   useEffect(() => {
     ;(async () => {
-      const cfg   = await window.electronAPI.config.get()
-      const token = await window.electronAPI.token.get()
+      const cfg   = await bridge.config.get()
+      const token = await bridge.token.get()
       if (cfg.serverUrl && token) {
         configure(cfg.serverUrl, token)
         setServerUrl(cfg.serverUrl)
@@ -41,12 +54,8 @@ export default function App() {
   }, [])
 
   const pingServer = useCallback(async (url) => {
-    try {
-      await healthCheck(url)
-      setOnline(true)
-    } catch {
-      setOnline(false)
-    }
+    try { await healthCheck(url); setOnline(true) }
+    catch { setOnline(false) }
   }, [])
 
   useEffect(() => {
@@ -63,19 +72,18 @@ export default function App() {
   }
 
   const handleDisconnect = async () => {
-    await window.electronAPI.token.clear()
-    await window.electronAPI.config.set({ serverUrl: '' })
-    setPaired(false)
-    setOnline(false)
-    setServerUrl('')
-    setPage('surveillance')
+    await bridge.token.clear()
+    await bridge.config.set({ serverUrl: '' })
+    setPaired(false); setOnline(false); setServerUrl(''); setPage('surveillance')
   }
 
   if (!ready) {
     return (
-      <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'var(--bg)',fontFamily:'var(--fm)',fontSize:11,color:'var(--t3)',flexDirection:'column',gap:14 }}>
-        <span className="spinner" />
-        <span style={{ letterSpacing:'.18em', textTransform:'uppercase' }}>INITIALISATION…</span>
+      <div className="flex flex-col items-center justify-center h-screen bg-background gap-4">
+        <div className="w-5 h-5 border-2 border-border-hi border-t-primary rounded-full animate-spin" />
+        <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          Initialisation…
+        </span>
       </div>
     )
   }
@@ -84,7 +92,15 @@ export default function App() {
     return (
       <>
         <Pairing onPaired={handlePaired} />
-        <ToastContainer />
+        <Toaster
+          theme="dark"
+          position="top-right"
+          toastOptions={{
+            classNames: {
+              toast: 'font-mono text-xs border border-border-hi bg-card shadow-md rounded-md',
+            },
+          }}
+        />
       </>
     )
   }
@@ -105,7 +121,15 @@ export default function App() {
           <PageComponent serverUrl={serverUrl} />
         </div>
       </div>
-      <ToastContainer />
+      <Toaster
+        theme="dark"
+        position="top-right"
+        toastOptions={{
+          classNames: {
+            toast: 'font-mono text-xs border border-border-hi bg-card shadow-md rounded-md',
+          },
+        }}
+      />
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { toast } from '../components/Toast'
+import { toast } from 'sonner'
 
 export async function safeAction(fn, successMsg = null, errorMsg = null) {
   try {

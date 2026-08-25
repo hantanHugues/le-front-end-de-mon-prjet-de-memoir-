@@ -3,6 +3,9 @@ import { getStreamUrl, getCameraStreamUrl, getAccessStatus, openDoor, lockDoor, 
 import StateChip from '../components/StateChip'
 import ScoreBar  from '../components/ScoreBar'
 import { safeAction } from '../utils/safeAction'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
+import { VideoOff, RefreshCw, Loader2 } from 'lucide-react'
+import { Button } from '../components/ui/button'
 
 function Clock() {
   const [time, setTime] = useState('')
@@ -12,7 +15,20 @@ function Clock() {
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
   }, [])
-  return <span style={{ fontFamily:'var(--fm)', fontSize:11, color:'var(--t3)', fontVariantNumeric:'tabular-nums' }}>{time}</span>
+  return (
+    <span style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--t3)', fontVariantNumeric: 'tabular-nums' }}>
+      {time}
+    </span>
+  )
+}
+
+const stateColor = {
+  GRANTED:             'var(--granted)',
+  DENIED:              'var(--denied)',
+  FINGERPRINT_PENDING: 'var(--pending)',
+  LIVENESS_PENDING:    'var(--pending)',
+  INTRUDER_CONFIRMED:  'var(--intruder)',
+  ANALYZING:           'var(--analyzing)',
 }
 
 export default function Surveillance() {
@@ -22,9 +38,9 @@ export default function Surveillance() {
   const [cameras,     setCameras]     = useState([])
   const [activeCam,   setActiveCam]   = useState(null)
   const [doorLoading, setDoorLoading] = useState(false)
-  const [countdown,   setCountdown]   = useState(null) // null | 3 | 2 | 1
-  const imgRef      = useRef(null)
-  const countRef    = useRef(null)
+  const [countdown,   setCountdown]   = useState(null)
+  const imgRef   = useRef(null)
+  const countRef = useRef(null)
 
   useEffect(() => {
     getCameras()
@@ -54,7 +70,6 @@ export default function Surveillance() {
     return () => { alive = false; clearInterval(id) }
   }, [])
 
-  // Countdown for door-open confirmation
   useEffect(() => {
     if (countdown === null) return
     if (countdown === 0) {
@@ -69,7 +84,7 @@ export default function Surveillance() {
 
   async function executeDoorOpen() {
     setDoorLoading(true)
-    await safeAction(openDoor, 'Porte déverrouillée', 'Impossible d\'ouvrir la porte')
+    await safeAction(openDoor, 'Porte déverrouillée', "Impossible d'ouvrir la porte")
     setDoorLoading(false)
   }
 
@@ -90,44 +105,55 @@ export default function Surveillance() {
   }
 
   const streamUrl = activeCam ? getCameraStreamUrl(activeCam) : getStreamUrl()
-
-  const stateColor = {
-    GRANTED:             'var(--granted)',
-    DENIED:              'var(--denied)',
-    FINGERPRINT_PENDING: 'var(--pending)',
-    LIVENESS_PENDING:    'var(--pending)',
-    INTRUDER_CONFIRMED:  'var(--intruder)',
-    ANALYZING:           'var(--analyzing)',
-  }
-
-  function handleCamChange(e) {
-    setActiveCam(e.target.value || null)
-    setStreamOk(true)
-  }
-
   const activeCamInfo = cameras.find(c => c.cam_id === activeCam)
 
+
+  const doorOpen = iot.door === 'open'
+
   return (
-    <>
-      <div className="topbar">
-        <span className="page-title">Surveillance</span>
-        <div className="topbar-right">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+      {/* Topbar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 24px', height: 52, flexShrink: 0,
+        borderBottom: '1px solid var(--border)', background: 'var(--card)',
+      }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>Surveillance</div>
+          <div style={{ fontSize: 12, color: 'var(--muted-foreground)', marginTop: 1 }}>
+            {activeCamInfo ? `${activeCamInfo.name} · ${activeCamInfo.fps} fps` : 'Flux principal'}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {cameras.length > 0 && (
-            <select className="cam-select" value={activeCam || ''} onChange={handleCamChange}>
-              <option value="">— flux par défaut —</option>
-              {cameras.map(c => (
-                <option key={c.cam_id} value={c.cam_id}>
-                  {c.name}{c.connected ? ' ●' : ' ○'}{c.zone ? ` [${c.zone}]` : ''}
-                </option>
-              ))}
-            </select>
+            /* `Select` Radix et non `<select>` natif : le menu natif est rendu
+               par Windows (fond blanc, police système) et rompait le thème. */
+            <Select
+              value={activeCam || 'default'}
+              onValueChange={v => { setActiveCam(v === 'default' ? null : v); setStreamOk(true) }}
+            >
+              <SelectTrigger style={{ minWidth: 200, height: 32 }}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Flux par défaut</SelectItem>
+                {cameras.map(c => (
+                  <SelectItem key={c.cam_id} value={c.cam_id}>
+                    {c.name}{c.zone ? ` · ${c.zone}` : ''}{c.connected ? '' : ' (hors ligne)'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
           <Clock />
         </div>
       </div>
 
+      {/* Main grid */}
       <div className="surv">
-        {/* ── Flux vidéo ── */}
+
+        {/* Video feed */}
         <div className="live-feed">
           {streamOk ? (
             <img
@@ -139,31 +165,55 @@ export default function Surveillance() {
               onError={() => setStreamOk(false)}
             />
           ) : (
-            <div className="live-offline">
-              <span className="live-offline-icon">◻</span>
-              <span>FLUX INDISPONIBLE</span>
-              <button className="btn" onClick={() => setStreamOk(true)}>Réessayer</button>
+            // État hors-ligne : c'est ce que le jury voit si la caméra ne répond
+            // pas. Il doit expliquer la situation, pas afficher deux mots perdus
+            // au milieu d'un rectangle noir.
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: 14, textAlign: 'center', padding: 32, maxWidth: 420,
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 14,
+                background: 'rgba(255,255,255,.04)',
+                border: '1px solid var(--border-hi)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <VideoOff size={24} style={{ color: 'var(--muted-foreground)' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--foreground)' }}>
+                  Flux vidéo indisponible
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--muted-foreground)', marginTop: 6, lineHeight: 1.5 }}>
+                  {activeCamInfo
+                    ? `« ${activeCamInfo.name} » ne renvoie pas d'image. Vérifiez que la caméra est branchée et que le service est démarré.`
+                    : "Aucune image reçue du serveur. Vérifiez que le service de capture est démarré."}
+                </div>
+              </div>
+              <Button variant="accent" onClick={() => setStreamOk(true)}>
+                <RefreshCw size={14} />
+                Réessayer
+              </Button>
             </div>
           )}
 
-          {/* Countdown confirmation overlay */}
+          {/* Countdown overlay */}
           {countdown !== null && (
             <div className="door-confirm">
               <div className="door-confirm-box">
-                <div className="door-confirm-label">[!] OUVERTURE PORTE — CONFIRMER</div>
+                <div className="door-confirm-label">Ouverture porte — confirmer</div>
                 <div className="door-confirm-count">{countdown}</div>
-                <div className="door-confirm-actions">
-                  <button className="btn btn-danger" onClick={cancelCountdown}>Annuler</button>
-                </div>
+                <Button variant="destructive" onClick={cancelCountdown}>
+                  Annuler
+                </Button>
               </div>
             </div>
           )}
 
+          {/* HUD */}
           <div className="feed-hud">
-            <div className="corner c-tl" />
-            <div className="corner c-tr" />
-            <div className="corner c-bl" />
-            <div className="corner c-br" />
+            <div className="corner c-tl" /><div className="corner c-tr" />
+            <div className="corner c-bl" /><div className="corner c-br" />
             <div className="hud-meta">
               <span className="hud-chip">LIVE</span>
               {activeCamInfo && (
@@ -177,14 +227,30 @@ export default function Surveillance() {
           </div>
         </div>
 
-        {/* ── Sessions ── */}
+        {/* Sessions panel */}
         <div className="sessions">
-          <div className="slabel">Détections actives</div>
+          <div style={{
+            padding: '12px 14px 8px',
+            fontSize: 11, fontWeight: 700, letterSpacing: '.09em',
+            textTransform: 'uppercase', color: 'var(--muted-foreground)',
+            borderBottom: '1px solid var(--border)', flexShrink: 0,
+          }}>
+            Détections actives
+          </div>
+
           {sessions.length === 0 && (
-            <div className="empty-state">AUCUNE DÉTECTION</div>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flex: 1, fontFamily: 'var(--fm)', fontSize: 12,
+              letterSpacing: '.07em', textTransform: 'uppercase',
+              color: 'var(--muted-foreground)',
+            }}>
+              Aucune détection
+            </div>
           )}
+
           {sessions.map(s => (
-            <div className="sess-card" key={s.id}>
+            <div key={s.id} className="sess-card">
               <div className="sess-hdr">
                 <span className="sess-id">ID#{s.id}</span>
                 <StateChip state={s.state} />
@@ -195,7 +261,7 @@ export default function Surveillance() {
                 {s.score > 0 && <ScoreBar score={s.score} color={stateColor[s.state]} />}
               </div>
               {s.state === 'LIVENESS_PENDING' && s.liveness_progress && (
-                <div style={{ fontFamily:'var(--fm)', fontSize:10, color:'var(--pending)', marginTop:6 }}>
+                <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--pending)', marginTop: 6 }}>
                   Clignements : {s.liveness_progress.blinks}/{s.liveness_progress.blinks_required}
                   &nbsp;·&nbsp;{s.liveness_progress.remaining}s restantes
                 </div>
@@ -204,50 +270,51 @@ export default function Surveillance() {
           ))}
         </div>
 
-        {/* ── Barre IoT ── */}
+        {/* IoT bar */}
         <div className="iot-bar">
           <div className="iot-item">
-            PORTE&nbsp;
-            <span className="iot-val" style={{ color: iot.door === 'open' ? 'var(--granted)' : 'var(--t2)', textShadow: iot.door === 'open' ? '0 0 8px var(--glow-ok)' : 'none' }}>
-              {iot.door === 'open' ? '● OUVERTE' : '● FERMÉE'}
+            <span className="iot-label">Porte</span>
+            <span className="iot-val" style={{ color: doorOpen ? 'var(--granted)' : 'var(--t2)' }}>
+              {doorOpen ? '● Ouverte' : '● Fermée'}
             </span>
           </div>
           <div className="iot-sep" />
           <div className="iot-item">
-            LUMIÈRE&nbsp;<span className="iot-val">{iot.light || '—'}</span>
+            <span className="iot-label">Lumière</span>
+            <span className="iot-val">{iot.light || '—'}</span>
           </div>
           <div className="iot-sep" />
           <div className="iot-item">
-            EMPREINTE&nbsp;
-            <span className="iot-val" style={{ color: iot.fingerprint ? 'var(--pending)' : 'var(--t3)', textShadow: iot.fingerprint ? '0 0 6px var(--glow-am)' : 'none' }}>
-              {iot.fingerprint ? '● ACTIF' : '—'}
+            <span className="iot-label">Empreinte</span>
+            <span className="iot-val" style={{ color: iot.fingerprint ? 'var(--pending)' : 'var(--t3)' }}>
+              {iot.fingerprint ? '● Actif' : '—'}
             </span>
           </div>
           <div className="iot-sep" />
-          <div className="iot-item" style={{ fontSize: 9, letterSpacing: '.14em' }}>
+          <div className="iot-item">
             {iot.iot_enabled
-              ? <span style={{ color: 'var(--granted)', textShadow: '0 0 6px var(--glow-ok)' }}>● RÉEL</span>
-              : <span style={{ color: 'var(--t3)' }}>○ MOCK</span>}
+              ? <span style={{ fontFamily: 'var(--fm)', fontSize: 11, letterSpacing: '.10em', color: 'var(--granted)' }}>● RÉEL</span>
+              : <span style={{ fontFamily: 'var(--fm)', fontSize: 11, letterSpacing: '.10em', color: 'var(--t4)' }}>○ MOCK</span>}
           </div>
           <div className="iot-acts">
-            <button
-              className="btn btn-accent"
+            <Button
+              variant="accent"
               onClick={handleOpenDoor}
               disabled={doorLoading || countdown !== null}
             >
-              {doorLoading ? <span className="spinner" style={{ width:11, height:11 }} /> : null}
+              {doorLoading && <Loader2 size={13} className="animate-spin" />}
               Ouvrir porte
-            </button>
-            <button
-              className="btn btn-danger"
+            </Button>
+            <Button
+              variant="destructive"
               onClick={handleLockDoor}
               disabled={doorLoading || countdown !== null}
             >
               Verrouiller
-            </button>
+            </Button>
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }

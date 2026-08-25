@@ -1,15 +1,16 @@
 import { Fragment } from 'react'
+import { Camera, FileText, Star, SlidersHorizontal, BarChart2, Bell } from 'lucide-react'
+
+const NAV = [
+  { id: 'surveillance', label: 'Surveillance',    section: 'Système',  Icon: Camera },
+  { id: 'journal',      label: "Journal d'accès", section: null,       Icon: FileText },
+  { id: 'vip',          label: 'VIP',             section: 'Gestion',  Icon: Star },
+  { id: 'config',       label: 'Configuration',   section: null,       Icon: SlidersHorizontal },
+  { id: 'stats',        label: 'Statistiques',    section: 'Analyse',  Icon: BarChart2 },
+  { id: 'alertes',      label: 'Alertes',         section: null,       Icon: Bell },
+]
 
 export default function Sidebar({ page, setPage, online, serverUrl, onDisconnect }) {
-  const items = [
-    { id: 'surveillance', label: 'Surveillance',   section: 'Système' },
-    { id: 'journal',      label: "Journal d'accès", section: null },
-    { id: 'vip',          label: 'VIP',             section: 'Gestion' },
-    { id: 'config',       label: 'Configuration',   section: null },
-    { id: 'stats',        label: 'Statistiques',    section: 'Analyse' },
-    { id: 'alertes',      label: 'Alertes',         section: null },
-  ]
-
   const addr = serverUrl.replace(/^https?:\/\//, '')
 
   return (
@@ -20,16 +21,18 @@ export default function Sidebar({ page, setPage, online, serverUrl, onDisconnect
       </div>
 
       <nav className="sb-nav">
-        {items.map(({ id, label, section }) => (
+        {NAV.map(({ id, label, section, Icon }) => (
           <Fragment key={id}>
             {section && <div className="nav-section">{section}</div>}
-            <div
+            <button
+              type="button"
               className={`nav-item${page === id ? ' active' : ''}`}
               onClick={() => setPage(id)}
+              aria-current={page === id ? 'page' : undefined}
             >
-              <span className="nav-dot" />
+              <Icon size={14} strokeWidth={2} style={{ opacity: page === id ? 1 : 0.55, flexShrink: 0 }} />
               {label}
-            </div>
+            </button>
           </Fragment>
         ))}
       </nav>
@@ -40,13 +43,14 @@ export default function Sidebar({ page, setPage, online, serverUrl, onDisconnect
           {online ? 'Connecté' : 'Hors ligne'}
         </div>
         <div className="srv-addr">{addr}</div>
-        <div
+        <button
+          type="button"
           className="pairing-link"
-          style={{ marginTop: 10, fontSize: 11 }}
+          style={{ marginTop: 10, fontSize: 12 }}
           onClick={onDisconnect}
         >
           Déconnecter
-        </div>
+        </button>
       </div>
     </aside>
   )
