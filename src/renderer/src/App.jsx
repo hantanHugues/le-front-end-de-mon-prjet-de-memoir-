@@ -72,9 +72,11 @@ export default function App() {
   }
 
   const handleDisconnect = async () => {
+    // On efface uniquement le jeton : l'adresse du serveur reste enregistrée
+    // pour que l'écran d'appairage la propose au lieu de repartir sur le
+    // placeholder par défaut à chaque reconnexion.
     await bridge.token.clear()
-    await bridge.config.set({ serverUrl: '' })
-    setPaired(false); setOnline(false); setServerUrl(''); setPage('surveillance')
+    setPaired(false); setOnline(false); setPage('surveillance')
   }
 
   if (!ready) {
@@ -91,7 +93,7 @@ export default function App() {
   if (!paired) {
     return (
       <>
-        <Pairing onPaired={handlePaired} />
+        <Pairing initialUrl={serverUrl} onPaired={handlePaired} />
         <Toaster
           theme="dark"
           position="top-right"

@@ -6,9 +6,9 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Field } from '../components/ui/field'
 
-export default function Pairing({ onPaired }) {
+export default function Pairing({ onPaired, initialUrl }) {
   const [step,      setStep]      = useState('url')   // 'url' | 'pin'
-  const [serverUrl, setServerUrl] = useState('http://192.168.1.100:8000')
+  const [serverUrl, setServerUrl] = useState(initialUrl || 'http://127.0.0.1:8000')
   const [pin,       setPin]       = useState('')
   const [loading,   setLoading]   = useState(false)
   const [error,     setError]     = useState('')
