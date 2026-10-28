@@ -325,6 +325,10 @@ input[type="range"]::-moz-range-thumb {
   grid-row: 1; grid-column: 1;
   display: flex; align-items: center; justify-content: center;
 }
+/* `contain`, pas `cover` : sur un système de sécurité, montrer le cadre
+   entier (quitte à avoir des bandes) prime sur remplir joliment l'espace —
+   `cover` rognait le haut/bas de l'image dès que le ratio caméra (4:3)
+   différait de celui du panneau, sans que rien ne signale la coupe. */
 .live-img { width: 100%; height: 100%; object-fit: contain; }
 
 .feed-hud { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }

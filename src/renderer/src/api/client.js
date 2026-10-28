@@ -16,6 +16,12 @@ export function getCameraStreamUrl(cam_id) {
   return `${_base}/stream/${encodeURIComponent(cam_id)}?token=${_token}`
 }
 
+// Capture d'une seule frame — utilisé par l'enrôlement VIP. Une vraie requête
+// (pas un flux), donc récupérable en blob directement, sans les soucis de
+// canvas/CORS qu'aurait posés une capture depuis le <img> MJPEG affiché.
+export const getSnapshot = (camId) =>
+  http().get(camId ? `/snapshot/${encodeURIComponent(camId)}` : '/snapshot', { responseType: 'blob' })
+
 function http() {
   return axios.create({
     baseURL: _base,
@@ -55,6 +61,15 @@ export const applyTemplate   = (name)  => http().post('/config/apply_template', 
 // IoT
 export const openDoor        = ()       => http().post('/iot/door/open')
 export const lockDoor        = ()       => http().post('/iot/door/lock')
+
+// MFA — simulation empreinte (pas de capteur ESP32 réel branché pour l'instant).
+// /fingerprint_result attend du form-urlencoded (Form(...) côté FastAPI), pas du JSON.
+export const fingerprintResult = (objectId, success) => {
+  const params = new URLSearchParams()
+  params.append('object_id', objectId)
+  params.append('success', success)
+  return http().post('/fingerprint_result', params)
+}
 
 // Health
 export const healthCheck     = (base)   =>

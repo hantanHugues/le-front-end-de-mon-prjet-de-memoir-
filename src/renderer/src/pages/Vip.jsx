@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getProfiles, deleteProfile, enrollVip } from '../api/client'
+import { getProfiles, deleteProfile, enrollVip, getSnapshot, getCameras, getStreamUrl, getCameraStreamUrl } from '../api/client'
 import { toast } from 'sonner'
 import { Button } from '../components/ui/button'
 import { PageHeader } from '../components/ui/page-header'
@@ -9,7 +9,7 @@ import { Input } from '../components/ui/input'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '../components/ui/dialog'
-import { UserPlus, X, Check, Loader2, Upload, ServerCrash, RefreshCw } from 'lucide-react'
+import { UserPlus, X, Check, Loader2, Upload, ServerCrash, RefreshCw, Camera, RotateCcw } from 'lucide-react'
 import { Skeleton } from '../components/ui/skeleton'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter,
@@ -20,29 +20,102 @@ function initials(name) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
-/* ── Enroll modal ─────────────────────────────────────────────── */
+const MAX_SHOTS = 5
+
+/* ── Enroll modal ─────────────────────────────────────────────────
+   Capture live plutôt qu'upload de fichier : la version précédente exigeait
+   d'avoir déjà une photo sur le disque, et n'enregistrait jamais qu'un seul
+   gabarit alors que la base en supporte plusieurs par profil. On capture
+   maintenant directement depuis la caméra (plusieurs prises), l'import de
+   fichier reste disponible en secours. */
 function EnrollModal({ onClose, onDone }) {
-  const [name,    setName]    = useState('')
-  const [file,    setFile]    = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
+  const [mode,     setMode]     = useState('capture')   // 'capture' | 'file'
+  const [name,     setName]     = useState('')
+  const [file,     setFile]     = useState(null)
+  const [shots,    setShots]    = useState([])           // [{id, blob, url}]
+  const [camId,    setCamId]    = useState(null)
+  const [capturing, setCapturing] = useState(false)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState('')
   const fileRef = useRef()
+
+  // La caméra active du dashboard sert par défaut à la capture — la même
+  // que celle affichée dans Surveillance, pas la peine de la re-sélectionner.
+  useEffect(() => {
+    getCameras()
+      .then(r => {
+        const cam = (r.data?.cameras || []).find(c => c.running)
+        if (cam) setCamId(cam.cam_id)
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => () => shots.forEach(s => URL.revokeObjectURL(s.url)), [])
+
+  async function handleCapture() {
+    setCapturing(true); setError('')
+    try {
+      const res = await getSnapshot(camId)
+      const blob = res.data
+      setShots(s => [...s, { id: crypto.randomUUID(), blob, url: URL.createObjectURL(blob) }])
+    } catch (err) {
+      setError(err.response?.data?.detail || "Impossible de capturer — vérifiez que la caméra est active.")
+    } finally { setCapturing(false) }
+  }
+
+  function removeShot(id) {
+    setShots(s => {
+      const target = s.find(x => x.id === id)
+      if (target) URL.revokeObjectURL(target.url)
+      return s.filter(x => x.id !== id)
+    })
+  }
 
   async function submit(e) {
     e.preventDefault()
-    if (!file || !name.trim()) return
+    const vipName = name.trim()
+    if (!vipName) return
+    if (mode === 'capture' && shots.length === 0) return
+    if (mode === 'file' && !file) return
+
     setError(''); setLoading(true)
-    try {
-      const form = new FormData()
-      form.append('name', name.trim())
-      form.append('file', file)
-      await enrollVip(form)
-      toast.success(`${name.trim()} enrôlé avec succès`)
+
+    const photos = mode === 'file' ? [file] : shots.map(s => s.blob)
+    let okCount = 0
+    let lastError = ''
+
+    // Séquentiel, pas Promise.all : /enroll ajoute un gabarit à la fois côté
+    // DB, et un message d'erreur clair par photo vaut mieux qu'un échec groupé.
+    for (const photo of photos) {
+      try {
+        const form = new FormData()
+        form.append('name', vipName)
+        form.append('file', photo, 'capture.jpg')
+        await enrollVip(form)
+        okCount += 1
+      } catch (err) {
+        lastError = err.response?.data?.detail || err.message
+      }
+    }
+
+    setLoading(false)
+
+    if (okCount === photos.length) {
+      toast.success(
+        photos.length > 1
+          ? `${vipName} enrôlé avec ${okCount} gabarits`
+          : `${vipName} enrôlé avec succès`
+      )
       onDone()
-    } catch (err) {
-      setError(err.response?.data?.detail || err.message)
-    } finally { setLoading(false) }
+    } else if (okCount > 0) {
+      toast.warning(`${vipName} : ${okCount}/${photos.length} gabarits enregistrés — ${lastError}`)
+      onDone()
+    } else {
+      setError(lastError || 'Aucune photo n\'a pu être enregistrée.')
+    }
   }
+
+  const canSubmit = name.trim() && (mode === 'capture' ? shots.length > 0 : !!file)
 
   // Portée sur Dialog (Radix) plutôt que sur un <div> maison : on récupère la
   // touche Échap, le piège à focus, le retour du focus au déclencheur, le
@@ -50,11 +123,12 @@ function EnrollModal({ onClose, onDone }) {
   // géré par la version écrite à la main.
   return (
     <Dialog open onOpenChange={o => !o && onClose()}>
-      <DialogContent className="max-w-[420px]">
+      <DialogContent className="max-w-[480px]">
         <DialogHeader>
           <DialogTitle>Enrôler un VIP</DialogTitle>
           <DialogDescription>
-            La photo servira à générer le gabarit biométrique de reconnaissance.
+            Chaque photo capturée devient un gabarit biométrique distinct — plusieurs
+            prises (angles, expressions) rendent la reconnaissance plus fiable.
           </DialogDescription>
         </DialogHeader>
 
@@ -69,25 +143,101 @@ function EnrollModal({ onClose, onDone }) {
             )}
           </Field>
 
-          <Field label="Photo de référence" className="mb-3.5">
-            {id => (
-              <>
-                <input
-                  ref={fileRef} id={id} type="file" accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={e => setFile(e.target.files[0])}
+          {/* Bascule capture / import */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            <Button
+              type="button" size="sm"
+              variant={mode === 'capture' ? 'accent' : 'outline'}
+              className="flex-1 justify-center"
+              onClick={() => setMode('capture')}
+            >
+              <Camera size={13} /> Webcam en direct
+            </Button>
+            <Button
+              type="button" size="sm"
+              variant={mode === 'file' ? 'accent' : 'outline'}
+              className="flex-1 justify-center"
+              onClick={() => setMode('file')}
+            >
+              <Upload size={13} /> Importer un fichier
+            </Button>
+          </div>
+
+          {mode === 'capture' ? (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{
+                position: 'relative', width: '100%', aspectRatio: '4/3',
+                background: '#000', borderRadius: 8, overflow: 'hidden',
+                border: '1px solid var(--border-hi)', marginBottom: 10,
+              }}>
+                <img
+                  key={camId || 'default'}
+                  src={camId ? getCameraStreamUrl(camId) : getStreamUrl()}
+                  alt="Aperçu caméra"
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                  onError={e => { e.target.style.display = 'none' }}
                 />
-                <Button
-                  type="button" variant="outline"
-                  className="w-full justify-center"
-                  onClick={() => fileRef.current.click()}
-                >
-                  <Upload size={14} />
-                  {file ? file.name : 'Choisir une photo…'}
-                </Button>
-              </>
-            )}
-          </Field>
+              </div>
+
+              <Button
+                type="button" variant="accent"
+                className="w-full justify-center"
+                onClick={handleCapture}
+                disabled={capturing || shots.length >= MAX_SHOTS}
+              >
+                {capturing ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                {shots.length >= MAX_SHOTS ? `Maximum atteint (${MAX_SHOTS})` : 'Capturer une photo'}
+              </Button>
+
+              {shots.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                  {shots.map(s => (
+                    <div key={s.id} style={{ position: 'relative', width: 64, height: 64 }}>
+                      <img src={s.url} alt="capture"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border-hi)' }} />
+                      <button
+                        type="button"
+                        aria-label="Retirer cette photo"
+                        onClick={() => removeShot(s.id)}
+                        style={{
+                          position: 'absolute', top: -6, right: -6,
+                          width: 18, height: 18, borderRadius: '50%',
+                          background: 'var(--destructive)', color: '#fff',
+                          border: 'none', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >
+                        <X size={11} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: 'var(--muted-foreground)', marginTop: 8 }}>
+                {shots.length}/{MAX_SHOTS} photo{shots.length !== 1 ? 's' : ''} — au moins une requise, plusieurs recommandées.
+              </div>
+            </div>
+          ) : (
+            <Field label="Photo de référence" className="mb-3.5">
+              {id => (
+                <>
+                  <input
+                    ref={fileRef} id={id} type="file" accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={e => setFile(e.target.files[0])}
+                  />
+                  <Button
+                    type="button" variant="outline"
+                    className="w-full justify-center"
+                    onClick={() => fileRef.current.click()}
+                  >
+                    <Upload size={14} />
+                    {file ? file.name : 'Choisir une photo…'}
+                  </Button>
+                </>
+              )}
+            </Field>
+          )}
 
           {error && (
             <div style={{
@@ -103,7 +253,7 @@ function EnrollModal({ onClose, onDone }) {
             <Button type="button" variant="default" onClick={onClose}>
               Annuler
             </Button>
-            <Button type="submit" variant="primary" disabled={loading || !file || !name.trim()}>
+            <Button type="submit" variant="primary" disabled={loading || !canSubmit}>
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
               Enrôler
             </Button>

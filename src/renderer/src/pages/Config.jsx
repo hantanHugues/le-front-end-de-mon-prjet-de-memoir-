@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import {
   Save, Loader2, Search, Plus, X, Check, TriangleAlert,
@@ -362,14 +362,14 @@ function CameraSection() {
 /* ── Page principale Config ──────────────────────────────────────── */
 
 export default function Config() {
-  const [cfg,      setCfg]      = useState({})
-  const [tpl,      setTpl]      = useState(null)
-  const [loading,  setLoading]  = useState(true)
-  const [saving,   setSaving]   = useState(false)
-  // Sans cet état, un serveur injoignable laissait `cfg` à {} : les sliders
-  // retombaient sur leur minimum et les toggles sur OFF, donnant une page de
-  // configuration crédible mais fausse — que « Sauvegarder » aurait poussée.
-  const [loadErr,  setLoadErr]  = useState(false)
+  const [cfg,        setCfg]        = useState({})
+  const [tpl,        setTpl]        = useState(null)
+  const [loading,    setLoading]    = useState(true)
+  const [saving,     setSaving]     = useState(false)
+  const [autoSaved,  setAutoSaved]  = useState(null)   // null=idle, false=saving, true=done
+  const [loadErr,    setLoadErr]    = useState(false)
+  const debounceRef  = useRef(null)
+  const initialLoad  = useRef(true)
 
   function fetchConfig() {
     setLoading(true)
@@ -381,13 +381,29 @@ export default function Config() {
 
   useEffect(() => { fetchConfig() }, [])
 
+  // Auto-save debounced — s'active uniquement après le premier chargement
+  useEffect(() => {
+    if (initialLoad.current) { initialLoad.current = false; return }
+    if (loadErr || loading) return
+    clearTimeout(debounceRef.current)
+    setAutoSaved(false)
+    debounceRef.current = setTimeout(async () => {
+      setAutoSaved(false)
+      try {
+        await putConfig(cfg)
+        setAutoSaved(true)
+        setTimeout(() => setAutoSaved(null), 2500)
+      } catch { setAutoSaved(null) /* silencieux — le bouton manuel reste disponible */ }
+    }, 800)
+    return () => clearTimeout(debounceRef.current)
+  }, [cfg])
+
   function patch(key, val) { setCfg(c => ({ ...c, [key]: val })) }
 
   async function handleApplyTemplate(name) {
     try {
       const res = await applyTemplate(name)
       setCfg(res.data.config || res.data)
-      // Marqué « appliqué » seulement après confirmation du serveur.
       setTpl(name)
       toast.success(`Template "${name}" appliqué`)
     } catch { toast.error("Impossible d'appliquer ce template") }
@@ -395,6 +411,7 @@ export default function Config() {
 
   async function handleSave() {
     setSaving(true)
+    clearTimeout(debounceRef.current)
     try { await putConfig(cfg); toast.success('Configuration sauvegardée') }
     catch { toast.error('Erreur lors de la sauvegarde') }
     finally { setSaving(false) }
@@ -404,6 +421,16 @@ export default function Config() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Topbar */}
       <PageHeader title="Configuration" subtitle="Paramètres système BioGate v7.0">
+        {autoSaved === false && !saving && (
+          <span style={{ fontSize: 11, color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Loader2 size={11} className="animate-spin" /> Sauvegarde…
+          </span>
+        )}
+        {autoSaved === true && (
+          <span style={{ fontSize: 11, color: 'var(--granted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Check size={11} /> Sauvegardé
+          </span>
+        )}
         <Button
           variant="accent" onClick={handleSave}
           disabled={saving || loadErr}

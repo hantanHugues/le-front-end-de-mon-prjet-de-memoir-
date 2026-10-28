@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getStreamUrl, getCameraStreamUrl, getAccessStatus, openDoor, lockDoor, getCameras } from '../api/client'
+import { getStreamUrl, getCameraStreamUrl, getAccessStatus, openDoor, lockDoor, getCameras, fingerprintResult } from '../api/client'
 import StateChip from '../components/StateChip'
 import ScoreBar  from '../components/ScoreBar'
 import { safeAction } from '../utils/safeAction'
@@ -25,6 +25,43 @@ function Clock() {
     <span style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--t3)', fontVariantNumeric: 'tabular-nums' }}>
       {time}
     </span>
+  )
+}
+
+// Barre valeur/seuil — équivalent dashboard du panneau debug blendshapes
+// (touche T) de client_camera.py : la valeur brute MediaPipe (0→1) contre le
+// seuil qui déclenche la détection, pour voir EXACTEMENT où on en est plutôt
+// que deviner si le geste est "assez" marqué.
+function ThresholdBar({ label, value, threshold }) {
+  if (value == null || threshold == null) return null
+  const pct       = Math.min(100, Math.max(0, value * 100))
+  const thPct     = Math.min(100, Math.max(0, threshold * 100))
+  const isOver    = value > threshold
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        fontFamily: 'var(--fm)', fontSize: 10, color: 'var(--muted-foreground)', marginBottom: 3,
+      }}>
+        <span>{label}</span>
+        <span style={{ color: isOver ? 'var(--granted)' : 'var(--muted-foreground)' }}>
+          {value.toFixed(3)} / {threshold.toFixed(2)}
+        </span>
+      </div>
+      <div style={{ position: 'relative', height: 6, background: 'var(--secondary)', borderRadius: 3, overflow: 'visible' }}>
+        <div style={{
+          position: 'absolute', top: 0, left: 0, height: '100%', borderRadius: 3,
+          width: `${pct}%`,
+          background: isOver ? 'var(--granted)' : 'var(--primary)',
+          transition: 'width 80ms linear',
+        }} />
+        {/* Marqueur du seuil */}
+        <div style={{
+          position: 'absolute', top: -2, left: `${thPct}%`,
+          width: 2, height: 10, background: 'var(--pending)',
+        }} />
+      </div>
+    </div>
   )
 }
 
@@ -88,6 +125,17 @@ export default function Surveillance() {
     countRef.current = setTimeout(() => setCountdown(c => (c ?? 1) - 1), 1000)
     return () => clearTimeout(countRef.current)
   }, [countdown])
+
+  // Pas de capteur d'empreinte ESP32 branché pour l'instant — ce bouton
+  // simule son résultat pour pouvoir tester la voie "empreinte" du MFA
+  // parallèle (empreinte OU sourire/clignement, le premier qui réussit).
+  async function handleFingerprint(sessionId, success) {
+    await safeAction(
+      () => fingerprintResult(sessionId, success),
+      success ? 'Empreinte simulée : validée' : 'Empreinte simulée : refusée',
+      "Impossible d'envoyer le résultat d'empreinte",
+    )
+  }
 
   async function executeDoorOpen() {
     setDoorLoading(true)
@@ -264,11 +312,43 @@ export default function Surveillance() {
                 <span className="score-num">{s.score ? `${s.score}%` : '—'}</span>
                 {s.score > 0 && <ScoreBar score={s.score} color={stateColor[s.state]} />}
               </div>
-              {s.state === 'LIVENESS_PENDING' && s.liveness_progress && (
-                <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--pending)', marginTop: 6 }}>
-                  Clignements : {s.liveness_progress.blinks}/{s.liveness_progress.blinks_required}
-                  &nbsp;·&nbsp;{s.liveness_progress.remaining}s restantes
-                </div>
+              {(s.state === 'FINGERPRINT_PENDING' || s.state === 'LIVENESS_PENDING') && (
+                <>
+                  {/* Le geste attendu est tiré au sort une seule fois par session
+                      (voir LivenessDetector) — un seul des deux compte ici, pas
+                      la peine d'afficher l'autre. */}
+                  <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--pending)', marginTop: 6, fontWeight: 700 }}>
+                    Doigt&nbsp;OU&nbsp;{s.liveness_progress?.challenge_label || '…'}
+                  </div>
+
+                  {s.liveness_progress?.challenge === 'blink' && (
+                    <>
+                      <div style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--muted-foreground)', marginTop: 2 }}>
+                        Clignements : {s.liveness_progress.blinks}/{s.liveness_progress.blinks_required}
+                        &nbsp;·&nbsp;{s.liveness_progress.remaining}s restantes
+                      </div>
+                      <ThresholdBar label="BLINK" value={s.liveness_progress.blink_score} threshold={s.liveness_progress.blink_threshold} />
+                    </>
+                  )}
+                  {s.liveness_progress?.challenge === 'smile' && (
+                    <>
+                      <div style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--muted-foreground)', marginTop: 2 }}>
+                        {s.liveness_progress.smiling ? 'Sourire détecté, maintenez…' : 'En attente du sourire…'}
+                        &nbsp;·&nbsp;{s.liveness_progress.remaining}s restantes
+                      </div>
+                      <ThresholdBar label="SMILE" value={s.liveness_progress.smile_score} threshold={s.liveness_progress.smile_threshold} />
+                    </>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <Button variant="accent" size="sm" onClick={() => handleFingerprint(s.id, true)}>
+                      Empreinte OK
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => handleFingerprint(s.id, false)}>
+                      Empreinte ✗
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
           ))}
