@@ -58,6 +58,10 @@ export const putConfig       = (data)   => http().put('/config', data)
 export const getTemplates    = ()       => http().get('/config/templates')
 export const applyTemplate   = (name)  => http().post('/config/apply_template', { template_name: name })
 
+// Alertes (Telegram / e-mail) — le serveur utilise la configuration enregistrée
+export const testAlert          = (channel) => http().post('/alerts/test', { channel }, { timeout: 30000 })
+export const detectTelegramChat = ()        => http().post('/alerts/telegram/detect', {}, { timeout: 30000 })
+
 // IoT
 export const openDoor        = ()       => http().post('/iot/door/open')
 export const lockDoor        = ()       => http().post('/iot/door/lock')

@@ -9,7 +9,7 @@
  */
 import { createServer } from 'http'
 
-const PORT = 8000
+const PORT = Number(process.env.MOCK_PORT) || 8000
 const now = Date.now()
 const iso = (minutesAgo) => new Date(now - minutesAgo * 60_000).toISOString()
 
@@ -53,6 +53,16 @@ const CONFIG = {
   LIVENESS_CHALLENGE_TIMEOUT: 15,
   ALERT_GRACE_PERIOD: 45,
   RGPD_SNAPSHOT_RETENTION_HOURS: 168,
+  // Les secrets sortent masqués, comme avec le vrai serveur.
+  ALERT_TELEGRAM_ENABLED: true,
+  TELEGRAM_BOT_TOKEN: '********',
+  TELEGRAM_CHAT_ID: '123456789',
+  ALERT_EMAIL_ENABLED: true,
+  SMTP_HOST: 'smtp.gmail.com',
+  SMTP_PORT: 587,
+  SMTP_USER: 'alertes@gmail.com',
+  SMTP_PASSWORD: '',
+  ALERT_EMAIL_TO: 'hugues@exemple.com',
   IOT_ENABLED: false,
   FINGERPRINT_ESP32_IP: '192.168.1.101',
   DOOR_ESP32_IP: '192.168.1.102',
@@ -85,6 +95,8 @@ const routes = [
   [/^\/config$/,           () => CONFIG],
   [/^\/cameras\/scan\/usb$/, () => ({ devices: [{ usb_index: 0, label: 'HD WebCam (integrated)' }] })],
   [/^\/cameras/,           () => ({ cameras: CAMERAS })],
+  [/^\/alerts\/test$/,     () => ({ success: true, message: 'Message de test envoyé sur Telegram.' })],
+  [/^\/alerts\/telegram\/detect$/, () => ({ success: true, chat_id: '123456789', label: 'Hugues' })],
   [/^\/access_status$/,    () => ACCESS_STATUS],
   [/^\/iot\//,             () => ({ ok: true })],
   [/^\/health$/,           () => ({ status: 'ok' })],

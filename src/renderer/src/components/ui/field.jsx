@@ -15,10 +15,10 @@ import { Label } from './label'
  *     {id => <Input id={id} … />}
  *   </Field>
  */
-export function Field({ label, hint, children, className }) {
+export function Field({ label, hint, children, className, style }) {
   const id = useId()
   return (
-    <div className={className}>
+    <div className={className} style={style}>
       <Label htmlFor={id}>{label}</Label>
       {typeof children === 'function' ? children(id) : children}
       {hint && (
