@@ -5,7 +5,7 @@ import {
   ScanFace, ShieldCheck, Bell, Wifi, Video, ChevronRight,
 } from 'lucide-react'
 import {
-  getConfig, putConfig, applyTemplate,
+  getConfig, putConfig, applyTemplate, getRgpdStatus,
   getCameras, addCamera, deleteCamera, scanUsbCameras,
 } from '../api/client'
 import { Button } from '../components/ui/button'
@@ -124,6 +124,59 @@ function ParamToggle({ label, cfgKey, value, onChange, note }) {
           `aria-label`, un lecteur d'écran annonce « interrupteur » sans dire lequel. */}
       <Switch aria-label={label} checked={!!value} onCheckedChange={v => onChange(cfgKey, v)} />
     </Row>
+  )
+}
+
+const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`
+
+function agoLabel(iso) {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  if (!isFinite(minutes) || minutes < 1) return "à l'instant"
+  if (minutes < 60) return `il y a ${minutes} min`
+  return `il y a ${Math.floor(minutes / 60)} h`
+}
+
+// Statut réel de la purge automatique : une rétention n'est une promesse tenue que si
+// on peut voir qu'elle tourne (dernière purge, photos encore stockées, âge de la plus ancienne).
+function RgpdStatus() {
+  const [status, setStatus] = useState(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    getRgpdStatus()
+      .then(r => { if (alive) setStatus(r.data) })
+      .catch(() => { if (alive) setFailed(true) })
+    return () => { alive = false }
+  }, [])
+
+  const mono = {
+    fontFamily: 'var(--fm)', fontSize: 12, lineHeight: 1.6,
+    color: 'var(--muted-foreground)', textAlign: 'right',
+  }
+  if (failed) return <div style={mono}>Statut indisponible</div>
+  if (!status) return <Skeleton style={{ width: 230, height: 38 }} />
+
+  const purged = status.last_photos_purged + status.last_orphans_purged
+  // Des photos plus vieilles que la rétention + un cycle de purge : la purge ne tient pas sa promesse.
+  const late = status.oldest_snapshot_hours != null
+    && status.oldest_snapshot_hours > status.retention_hours + status.interval_minutes / 60 + 1
+
+  return (
+    <div style={mono}>
+      <div style={{ color: 'var(--foreground)' }}>Automatique · toutes les {status.interval_minutes} min</div>
+      <div style={status.error ? { color: 'var(--denied)' } : undefined}>
+        {status.error
+          ? 'Dernière purge en échec'
+          : status.last_run
+            ? `Dernière purge ${agoLabel(status.last_run)} · ${purged === 0 ? 'aucune photo supprimée' : plural(purged, 'photo supprimée', 'photos supprimées')}`
+            : 'Première purge au démarrage du serveur'}
+      </div>
+      <div style={late ? { color: 'var(--pending)' } : undefined}>
+        {plural(status.snapshots_on_disk, 'photo stockée', 'photos stockées')}
+        {status.oldest_snapshot_hours != null && ` · la plus ancienne a ${status.oldest_snapshot_hours} h`}
+      </div>
+    </div>
   )
 }
 
@@ -550,6 +603,8 @@ export default function Config() {
                 min={0.3} max={3.0} step={0.1} unit=" s" value={cfg.FACE_RECHECK_INTERVAL} onChange={patch} />
               <Slider label="Limite d'analyse" cfgKey="FACE_ANALYSIS_TIME_LIMIT"
                 min={0.5} max={5.0} step={0.1} unit=" s" value={cfg.FACE_ANALYSIS_TIME_LIMIT} onChange={patch} />
+              <Slider label="Intrus sans visage après (0 = jamais)" cfgKey="FACE_ABSENT_LIMIT"
+                min={0} max={30} step={0.5} unit=" s" value={cfg.FACE_ABSENT_LIMIT} onChange={patch} />
             </div>
 
             {/* MFA */}
@@ -570,10 +625,9 @@ export default function Config() {
                 min={10} max={120} unit=" s" value={cfg.ALERT_GRACE_PERIOD} onChange={patch} />
               <Slider label="Rétention snapshots" cfgKey="RGPD_SNAPSHOT_RETENTION_HOURS"
                 min={24} max={720} unit=" h" value={cfg.RGPD_SNAPSHOT_RETENTION_HOURS} onChange={patch} />
-              <Row label="Purge automatique" cfgKey="">
-                <span style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--muted-foreground)' }}>
-                  Manuelle — voir Journal → Purge RGPD
-                </span>
+              <Row label="Purge automatique" cfgKey=""
+                note="Supprime uniquement les photos ; le journal et les statistiques sont conservés.">
+                <RgpdStatus />
               </Row>
             </div>
 

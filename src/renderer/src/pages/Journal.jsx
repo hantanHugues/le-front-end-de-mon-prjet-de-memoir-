@@ -266,7 +266,9 @@ export default function Journal() {
           <AlertDialogHeader>
             <AlertDialogTitle>Purger les logs anciens ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Supprime définitivement tous les événements au-delà de la période de rétention RGPD configurée.
+              Supprime définitivement les événements du journal plus anciens que la rétention RGPD
+              configurée, avec leurs photos. La purge automatique, elle, ne supprime que les photos
+              (toutes les heures) et garde l'historique.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

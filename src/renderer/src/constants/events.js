@@ -10,6 +10,7 @@ export const EVENT_TYPES = {
   FINGERPRINT_OK:      'FINGERPRINT_OK',
   FINGERPRINT_FAIL:    'FINGERPRINT_FAIL',
   FLIGHT_ALERT:        'FLIGHT_ALERT',
+  FACELESS_PASSAGE:    'FACELESS_PASSAGE',
   DETECTION:           'DETECTION',
 }
 
@@ -22,16 +23,19 @@ export const EVENT_META = {
   FINGERPRINT_OK:     { cls: 's-granted',  label: 'EMPREINTE' },
   FINGERPRINT_FAIL:   { cls: 's-denied',   label: 'EMPREINTE ✗' },
   FLIGHT_ALERT:       { cls: 's-denied',   label: 'FUITE' },
+  FACELESS_PASSAGE:   { cls: 's-idle',     label: 'PASSAGE' },
   DETECTION:          { cls: 's-idle',     label: 'DÉTECTION' },
 }
 
 // Options du filtre — seuls les types réellement émis par le pipeline actuel
-// (voir api.py / core/face_recognizer.py : ACCESS_DENIED, FLIGHT_ALERT et
-// DETECTION sont déclarés côté DB mais jamais produits aujourd'hui).
+// (voir api.py / core/face_recognizer.py : ACCESS_DENIED et DETECTION sont
+// déclarés côté DB mais jamais produits aujourd'hui).
 export const EVENT_FILTER_OPTIONS = [
   { value: EVENT_TYPES.VIP_ENTRY,          label: 'Accès VIP' },
   { value: EVENT_TYPES.INTRUDER_PENDING,   label: 'Intrus (en cours)' },
   { value: EVENT_TYPES.INTRUDER_CONFIRMED, label: 'Intrus confirmé' },
+  { value: EVENT_TYPES.FLIGHT_ALERT,       label: 'Fuite (visage vu, parti avant le verdict)' },
+  { value: EVENT_TYPES.FACELESS_PASSAGE,   label: 'Passage sans visage' },
   { value: EVENT_TYPES.LIVENESS_SUCCESS,   label: 'Liveness réussi' },
   { value: EVENT_TYPES.FINGERPRINT_OK,     label: 'Empreinte validée' },
   { value: EVENT_TYPES.FINGERPRINT_FAIL,   label: 'Empreinte refusée' },

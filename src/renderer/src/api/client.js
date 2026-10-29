@@ -45,6 +45,7 @@ export const getAccessStatus = ()       => http().get('/access_status')
 export const getLogs         = (params) => http().get('/logs', { params })
 export const deleteLog       = (id)     => http().delete(`/logs/${id}`)
 export const purgeLogs       = (hours)  => http().delete('/logs/purge', { params: { retention_hours: hours } })
+export const getRgpdStatus   = ()       => http().get('/rgpd/status')
 
 // VIP
 export const getProfiles     = ()       => http().get('/profiles')

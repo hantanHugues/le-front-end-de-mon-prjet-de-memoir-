@@ -21,6 +21,7 @@ const NAMES = [
 const EVENTS = [
   'VIP_ENTRY', 'VIP_ENTRY', 'VIP_ENTRY', 'LIVENESS_SUCCESS', 'FINGERPRINT_OK',
   'INTRUDER_CONFIRMED', 'INTRUDER_PENDING', 'FINGERPRINT_FAIL', 'ACCESS_DENIED',
+  'FACELESS_PASSAGE', 'FLIGHT_ALERT',
 ]
 
 const LOGS = Array.from({ length: 64 }, (_, i) => {
@@ -47,6 +48,7 @@ const CONFIG = {
   FACE_RECOGNITION_THRESHOLD: 0.42,
   FACE_RECHECK_INTERVAL: 1.2,
   FACE_ANALYSIS_TIME_LIMIT: 2.5,
+  FACE_ABSENT_LIMIT: 0,
   MFA_REQUIRED: true,
   LIVENESS_ENABLED: true,
   FINGERPRINT_TIMEOUT: 25,
@@ -95,6 +97,12 @@ const routes = [
   [/^\/config$/,           () => CONFIG],
   [/^\/cameras\/scan\/usb$/, () => ({ devices: [{ usb_index: 0, label: 'HD WebCam (integrated)' }] })],
   [/^\/cameras/,           () => ({ cameras: CAMERAS })],
+  [/^\/rgpd\/status$/,     () => ({
+    retention_hours: 72, interval_minutes: 60,
+    last_run: new Date(now - 12 * 60_000 - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 19),
+    last_photos_purged: 3, last_orphans_purged: 41, error: null,
+    snapshots_on_disk: 6, oldest_snapshot_hours: 48.5,
+  })],
   [/^\/alerts\/test$/,     () => ({ success: true, message: 'Message de test envoyé sur Telegram.' })],
   [/^\/alerts\/telegram\/detect$/, () => ({ success: true, chat_id: '123456789', label: 'Hugues' })],
   [/^\/access_status$/,    () => ACCESS_STATUS],
