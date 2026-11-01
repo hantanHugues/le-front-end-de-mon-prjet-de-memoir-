@@ -45,16 +45,17 @@ const PROFILES = NAMES.map((name, i) => ({
 }))
 
 const CONFIG = {
-  FACE_RECOGNITION_THRESHOLD: 0.42,
-  FACE_RECHECK_INTERVAL: 1.2,
-  FACE_ANALYSIS_TIME_LIMIT: 2.5,
+  // Valeurs par défaut du profil « Domicile », celles que décrit le mémoire.
+  FACE_RECOGNITION_THRESHOLD: 0.35,
+  FACE_RECHECK_INTERVAL: 0.8,
+  FACE_ANALYSIS_TIME_LIMIT: 1,
   FACE_ABSENT_LIMIT: 0,
-  MFA_REQUIRED: true,
+  MFA_REQUIRED: false,
   LIVENESS_ENABLED: true,
-  FINGERPRINT_TIMEOUT: 25,
-  LIVENESS_CHALLENGE_TIMEOUT: 15,
-  ALERT_GRACE_PERIOD: 45,
-  RGPD_SNAPSHOT_RETENTION_HOURS: 168,
+  FINGERPRINT_TIMEOUT: 15,
+  LIVENESS_CHALLENGE_TIMEOUT: 10,
+  ALERT_GRACE_PERIOD: 60,
+  RGPD_SNAPSHOT_RETENTION_HOURS: 72,
   // Les secrets sortent masqués, comme avec le vrai serveur.
   ALERT_TELEGRAM_ENABLED: true,
   TELEGRAM_BOT_TOKEN: '********',
@@ -124,6 +125,18 @@ createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', '*')
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
+
+  // Couplage : tout code à six chiffres est accepté, pour pouvoir afficher l'écran de saisie du code.
+  if (path === '/pair/request' && req.method === 'POST') {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ success: true, message: 'PIN généré — consultez le terminal du serveur.' }))
+    return
+  }
+  if (path === '/auth/token' && req.method === 'POST') {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ access_token: 'mock-token', token_type: 'bearer' }))
+    return
+  }
 
   // Modifier une caméra : comme le vrai serveur, les étoiles de la clé masquée sont acceptées.
   const edit = path.match(/^\/cameras\/([^/]+)$/)
