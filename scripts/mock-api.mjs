@@ -73,7 +73,7 @@ const CONFIG = {
 
 const CAMERAS = [
   { cam_id: 'cam_entree',  name: 'Portail avant',  type: 'usb',   usb_index: 0, zone: 'Entrée',  running: true,  connected: true,  fps: 24, url: null },
-  { cam_id: 'cam_couloir', name: 'Couloir Nord',   type: 'mjpeg', usb_index: 0, zone: 'Couloir', running: true,  connected: true,  fps: 18, url: 'http://192.168.1.140/stream' },
+  { cam_id: 'cam_couloir', name: 'Couloir Nord',   type: 'mjpeg', usb_index: 0, zone: 'Couloir', running: true,  connected: true,  fps: 18, url: 'http://biogate:********@192.168.1.140/stream' },
   { cam_id: 'cam_bureau',  name: 'Bureau direction', type: 'rtsp', usb_index: 0, zone: 'Bureau', running: false, connected: false, fps: 0,  url: 'rtsp://192.168.1.150/live' },
 ]
 
@@ -110,12 +110,32 @@ const routes = [
   [/^\/health$/,           () => ({ status: 'ok' })],
 ]
 
-createServer((req, res) => {
+function readBody(req) {
+  return new Promise(resolve => {
+    let data = ''
+    req.on('data', chunk => { data += chunk })
+    req.on('end', () => { try { resolve(JSON.parse(data || '{}')) } catch { resolve({}) } })
+  })
+}
+
+createServer(async (req, res) => {
   const path = req.url.split('?')[0]
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', '*')
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
+
+  // Modifier une caméra : comme le vrai serveur, les étoiles de la clé masquée sont acceptées.
+  const edit = path.match(/^\/cameras\/([^/]+)$/)
+  if (edit && req.method === 'PUT') {
+    const body = await readBody(req)
+    const cam = CAMERAS.find(c => c.cam_id === decodeURIComponent(edit[1]))
+    if (cam) Object.assign(cam, { name: body.name, type: body.type, usb_index: body.usb_index, zone: body.zone, url: body.url || null })
+    console.log('PUT camera', cam && cam.cam_id, JSON.stringify(body))
+    res.writeHead(cam ? 200 : 404, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(cam ? { success: true } : { detail: 'introuvable' }))
+    return
+  }
 
   const hit = routes.find(([re]) => re.test(path))
   const body = hit ? hit[1]() : { detail: `mock: route inconnue ${path}` }
