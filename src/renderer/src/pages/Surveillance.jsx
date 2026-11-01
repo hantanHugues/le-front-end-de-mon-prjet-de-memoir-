@@ -318,7 +318,7 @@ export default function Surveillance() {
                       (voir LivenessDetector) — un seul des deux compte ici, pas
                       la peine d'afficher l'autre. */}
                   <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--pending)', marginTop: 6, fontWeight: 700 }}>
-                    Doigt&nbsp;OU&nbsp;{s.liveness_progress?.challenge_label || '…'}
+                    Doigt{s.liveness_progress ? <>&nbsp;OU&nbsp;{s.liveness_progress.challenge_label || '…'}</> : ''}
                   </div>
 
                   {s.liveness_progress?.challenge === 'blink' && (
