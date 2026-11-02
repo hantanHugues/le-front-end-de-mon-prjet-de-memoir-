@@ -25,8 +25,8 @@ import {
 const TEMPLATES = [
   { name: 'portail',        label: 'Portail',        desc: 'MFA off · Seuil souple 0.35',   color: 'var(--granted)' },
   { name: 'domicile',       label: 'Domicile',       desc: 'MFA optionnel · Liveness on',   color: 'var(--primary)' },
-  { name: 'bureau',         label: 'Bureau',         desc: 'MFA obligatoire · Fingerprint', color: 'var(--pending)' },
-  { name: 'haute_securite', label: 'Haute Sécurité', desc: 'MFA + fingerprint + liveness',  color: 'var(--denied)' },
+  { name: 'bureau',         label: 'Bureau',         desc: 'MFA · Empreinte ou liveness',   color: 'var(--pending)' },
+  { name: 'haute_securite', label: 'Haute Sécurité', desc: 'MFA · Empreinte seule',         color: 'var(--denied)' },
 ]
 
 const CAM_TYPES = [
