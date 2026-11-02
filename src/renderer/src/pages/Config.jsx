@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import {
-  Save, Loader2, Search, Plus, X, Check, TriangleAlert,
+  Save, Loader2, Search, Plus, X, Check, TriangleAlert, Pencil,
   ScanFace, ShieldCheck, Bell, Wifi, Video, ChevronRight,
 } from 'lucide-react'
 import {
   getConfig, putConfig, applyTemplate, getRgpdStatus,
-  getCameras, addCamera, deleteCamera, scanUsbCameras,
+  getCameras, addCamera, updateCamera, deleteCamera, scanUsbCameras,
 } from '../api/client'
 import { Button } from '../components/ui/button'
 import { PageHeader } from '../components/ui/page-header'
@@ -25,8 +25,8 @@ import {
 const TEMPLATES = [
   { name: 'portail',        label: 'Portail',        desc: 'MFA off · Seuil souple 0.35',   color: 'var(--granted)' },
   { name: 'domicile',       label: 'Domicile',       desc: 'MFA optionnel · Liveness on',   color: 'var(--primary)' },
-  { name: 'bureau',         label: 'Bureau',         desc: 'MFA obligatoire · Fingerprint', color: 'var(--pending)' },
-  { name: 'haute_securite', label: 'Haute Sécurité', desc: 'MFA + fingerprint + liveness',  color: 'var(--denied)' },
+  { name: 'bureau',         label: 'Bureau',         desc: 'MFA · Empreinte ou liveness',   color: 'var(--pending)' },
+  { name: 'haute_securite', label: 'Haute Sécurité', desc: 'MFA · Empreinte seule',         color: 'var(--denied)' },
 ]
 
 const CAM_TYPES = [
@@ -208,6 +208,7 @@ function CameraSection() {
   const [showForm,   setShowForm]   = useState(false)
   const [err,        setErr]        = useState('')
   const [pendingDel, setPendingDel] = useState(null)
+  const [editingId,  setEditingId]  = useState(null)   // cam_id de la caméra en cours de modification
 
   const loadCameras = useCallback(() => {
     getCameras().then(r => setCameras(r.data?.cameras || [])).catch(() => {})
@@ -228,19 +229,38 @@ function CameraSection() {
 
   function prefillUsb(dev) {
     setForm({ name: dev.label, type: 'usb', url: '', usb_index: dev.usb_index, zone: '' })
-    setShowForm(true); setUsbDevices([])
+    setEditingId(null); setShowForm(true); setUsbDevices([])
   }
 
-  async function handleAdd(e) {
+  // Le serveur renvoie l'adresse avec la clé masquée (********) : on la laisse telle quelle,
+  // il remet la vraie clé tout seul tant que les étoiles sont là.
+  function startEdit(cam) {
+    setForm({
+      name: cam.name, type: cam.type, url: cam.url || '',
+      usb_index: cam.usb_index ?? 0, zone: cam.zone || '',
+    })
+    setEditingId(cam.cam_id); setShowForm(true); setErr(''); setUsbDevices([])
+  }
+
+  function closeForm() {
+    setShowForm(false); setEditingId(null); setForm(EMPTY_CAM); setErr('')
+  }
+
+  async function handleSave(e) {
     e.preventDefault()
     if (!form.name.trim()) { setErr('Nom requis.'); return }
     setAdding(true); setErr('')
     try {
-      await addCamera(form)
-      setForm(EMPTY_CAM); setShowForm(false); loadCameras()
-      toast.success('Source vidéo ajoutée')
+      if (editingId) {
+        await updateCamera(editingId, form)
+        toast.success('Source mise à jour')
+      } else {
+        await addCamera(form)
+        toast.success('Source vidéo ajoutée')
+      }
+      closeForm(); loadCameras()
     } catch (ex) {
-      setErr(ex.response?.data?.detail || "Erreur lors de l'ajout.")
+      setErr(ex.response?.data?.detail || (editingId ? 'Erreur lors de la modification.' : "Erreur lors de l'ajout."))
     } finally { setAdding(false) }
   }
 
@@ -261,7 +281,7 @@ function CameraSection() {
             {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
             Détecter USB
           </Button>
-          <Button variant="accent" size="sm" onClick={() => { setShowForm(v => !v); setErr('') }}>
+          <Button variant="accent" size="sm" onClick={() => (showForm ? closeForm() : (setShowForm(true), setErr('')))}>
             {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
             {showForm ? 'Annuler' : 'Ajouter'}
           </Button>
@@ -297,13 +317,18 @@ function CameraSection() {
 
         {showForm && (
           <form
-            onSubmit={handleAdd}
+            onSubmit={handleSave}
             style={{
               margin: '12px 0', padding: 16, borderRadius: 8,
               background: 'var(--secondary)', border: '1px solid var(--border-hi)',
               display: 'flex', flexDirection: 'column', gap: 12,
             }}
           >
+            {editingId && (
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--foreground)' }}>
+                Modifier « {cameras.find(c => c.cam_id === editingId)?.name} »
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <Label style={{ marginBottom: 6, display: 'block' }}>Nom</Label>
@@ -328,6 +353,12 @@ function CameraSection() {
                   value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
                   style={{ fontFamily: 'var(--fm)', fontSize: 13 }}
                 />
+                {editingId && form.url.includes('********') && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted-foreground)' }}>
+                    La clé est masquée et reste enregistrée : changez seulement l'adresse IP,
+                    ou remplacez les étoiles par une nouvelle clé.
+                  </div>
+                )}
               </div>
             )}
             {form.type === 'usb' && (
@@ -386,6 +417,10 @@ function CameraSection() {
             <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: c.running ? (c.connected ? 'var(--granted)' : 'var(--pending)') : 'var(--muted-foreground)' }}>
               {c.running ? (c.connected ? `${c.fps} fps` : 'Connexion…') : 'hors ligne'}
             </div>
+            <Button variant="ghost" size="icon" style={{ height: 28, width: 28 }}
+              title="Modifier" onClick={() => startEdit(c)}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
             <Button variant="ghost" size="icon" style={{ height: 28, width: 28 }}
               title="Supprimer" onClick={() => setPendingDel(c)}>
               <X className="h-3.5 w-3.5" />
